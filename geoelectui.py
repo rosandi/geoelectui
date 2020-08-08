@@ -43,14 +43,14 @@ msrev=Event()
 
 ### TUNABLE PARAMETERS ###
 
-rrange={'low':10.0,'high':20.0}
+rrange={'low':10.0,'high':10.0}
 crange=(0.025,50.0)
 injection_low_pwm=20
 injection_pwm_increment=5
 injection_volt_limit=200
 injection_volt_low=15
 injection_max_try=50
-voltage_limit=4966.57
+voltage_limit=4966.0
 max_measurement_try=10
 repeat_measurement=1
 filename_prefix='data-'
@@ -147,7 +147,9 @@ def adjustcurrent(crange, ntry=injection_max_try):
 	return ip
 
 def automated_measurement():
-	global resarr,boxarr
+	global resarr,boxarr,rrange
+	
+	firsttake=True
 	
 	for prow in range(len(resarr)):
 		
@@ -199,10 +201,14 @@ def automated_measurement():
 				mr=np.abs((mv-sv)/mi)
 				resarr[prow][v]=(mv,mi,mr,sv,(aa,bb,cc,dd))
 			
-			if rrange['low']>mr:
-				rrange['low']=mr
-			if rrange['high']<mr:
-				rrange['high']=mr
+			if firsttake:
+				rrange={'low':mr,'high':mr}
+				firsttake=False
+			else:
+				if rrange['low']>mr:
+					rrange['low']=mr
+				if rrange['high']<mr:
+					rrange['high']=mr
 									
 			print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
 			aa+=1
@@ -253,9 +259,11 @@ dosave=IntVar()
 dorep=IntVar()
 dosave.set(1)
 dorep.set(0)
+ckeylow=None
+ckeyhigh=None
 
 def drawresmap():
-	global boxarr,proarr
+	global boxarr,proarr,ckeylow,ckeyhigh
 
 	bx=boxofs
 	by=0.7*boxski
@@ -284,6 +292,24 @@ def drawresmap():
 		boxarr.append(tarr)
 		by+=boxsz+boxsep
 		bxx+=3*boxsz/2 + boxsep
+	
+	cbx=100
+	cby=WINH-250
+	
+	for c in colorcode:
+		cvs.create_rectangle(cbx,cby,cbx+5,cby+20,outline=c,fill=c)
+		cbx+=5
+
+	ckeylow=cvs.create_text(75,cby+10,text='%0.2f'%(rrange['low']),fill=colorcode[0])
+	ckeyhigh=cvs.create_text(460,cby+10,text='%0.2f'%(rrange['high']),fill=colorcode[64])
+	
+def enableWidget(wlist, en=True): # wlist<-widget list
+	if en:
+		for a in wlist:
+			a['state']=NORMAL
+	else:
+		for a in wlist:
+			a['state']=DISABLED
 
 def update_display():
 	for i in range(len(resarr)):
@@ -291,14 +317,23 @@ def update_display():
 			r=resarr[i][j][2]
 			if r==-1:
 				continue
-			c=int(len(colorcode)*(r-rrange['low'])/(rrange['high']-rrange['low']))
+				
+			if rrange['low'] >= rrange['high']:
+				c=32
+			else:
+				c=int(len(colorcode)*(r-rrange['low'])/(rrange['high']-rrange['low']))
+				
 			if c>64:
 				c=64
+				
 			boxarr[i][j]['color']=colorcode[c]
 
 	for b in boxarr:
 		for v in b:
 			cvs.itemconfig(v['id'],fill=v['color'])
+	
+	cvs.itemconfig(ckeylow,text='%0.2f'%(rrange['low']))
+	cvs.itemconfig(ckeyhigh,text='%0.2f'%(rrange['high']))
 	
 	cvs.update_idletasks()
 
@@ -306,6 +341,7 @@ def update_display():
 		mw.after(100,update_display)
 	else:
 		bmsr['text']='MEASURE'
+		enableWidget(entries+buttons)
 		if dosave.get():
 			saveData()
 			if dorep.get():
@@ -323,7 +359,10 @@ def measurebtn():
 		bmsr['text']='MEASURE'
 		dorep.set(0)
 		msrev.clear()
+		enableWidget(entries+buttons)
+		
 	else:
+		enableWidget(entries+buttons,False)
 		apply_param()
 		bmsr['text']='STOP MEASUREMENT'
 		for b in boxarr:
@@ -351,7 +390,7 @@ def runcali():
 
 def commandButton(label, cmd, y):
 	bt=Button(CommandArea, text=label, command=cmd)
-	bt.grid(row=y,column=0)
+	bt.grid(row=y,column=0,sticky='WE')
 	return bt
 	
 # the buttons
@@ -359,16 +398,24 @@ def commandButton(label, cmd, y):
 bmsr=commandButton('MEASURE',measurebtn,0)
 brun=commandButton('CHECK RELAY',runcheck,1)
 bcali=commandButton('CALIBRATE',runcali,2)
-Checkbutton(CommandArea, text='Save Measurement Data',variable=dosave).grid(row=3)
-Checkbutton(CommandArea, text='Loop Measurement',variable=dorep).grid(row=4)
+
+fck=Frame(CommandArea)
+fck.grid(row=3,pady=10)
+Checkbutton(fck, text='Save Measurement Data',variable=dosave).grid(row=0,sticky='W')
+Checkbutton(fck, text='Loop Measurement',variable=dorep).grid(row=1,sticky='W')
+
+buttons=[brun,bcali]
 
 #### PARAMS ####
 
+entries=[]
+
 def paramEntry(label,text,y):
-	Label(ParamArea,text=label).grid(row=y,column=0)
+	Label(ParamArea,text=label).grid(row=y,column=0,sticky='W')
 	ent=Entry(ParamArea)
 	ent.insert(END,text)
 	ent.grid(row=y,column=1)
+	entries.append(ent)
 	return ent
 
 def apply_param():
@@ -396,7 +443,9 @@ entry_imaxtry=paramEntry('Max Injection Try ', str(injection_max_try),5)
 entry_mmaxtry=paramEntry('Max Measurement Try ', str(max_measurement_try),6)
 entry_filename=paramEntry('File Prefix ', filename_prefix,7)
 
-Button(ParamArea, text='APPLY PARAMETERS', command=apply_param).grid(row=8,column=0,columnspan=2,pady=10)
+ebt=Button(ParamArea, text='APPLY PARAMETERS', command=apply_param)
+ebt.grid(row=8,column=0,columnspan=2,pady=10)
+entries.append(ebt)
 
 ##########################
 ###### MAIN PROGRAM ######
@@ -411,8 +460,7 @@ except:
 	import gelecdummy as g
 	g.init('null')
 
-g.set_naverage(10)
-
+g.set_naverage(20)
 calcpoints()
 drawresmap()
 

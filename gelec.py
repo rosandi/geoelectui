@@ -110,18 +110,18 @@ def discharge(minvolt, minpwm=5, verbose=False):
 	
 	return ("discharged: %0.3fV"%(vlow))
 
-
+# just in case there are more than one field take the first!
 def measure_voltage():
-	return float(send('V'))
+	return float(send('V').split()[0])
 
 def measure_current():
-	return float(send('A'))
+	return float(send('A').split()[0])
 
 def measure_injection():
-	return float(send('J'))
+	return float(send('J').split()[0])
 
 def measure_shunt():
-	return float(send('S'))
+	return float(send('S').split()[0])
 
 def calibrate():
 	a=send('C').split()
