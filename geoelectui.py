@@ -52,6 +52,7 @@ voltage_limit=4966.0
 max_measurement_try=10
 repeat_measurement=1
 filename_prefix='data-'
+gfactor=1.0
 
 ##### COMMAND LINE PARAMETERS ####
 #
@@ -110,15 +111,6 @@ def calcpoints():
 		conarr.append({'conf': (pm,pp,vm,vp), 'nbox': nbox})
 		resarr.append(nbox*[(-1,-1,-1,-1, (0,0,0,0))])
 		nbox-=3
-	
-#for ar in boxarr:
-#	print(ar)
-
-#for ar in resarr:
-#	print(ar)
-
-#for ar in conarr:
-#	print(ar)
 
 def adjustcurrent(crange, ntry=injection_max_try):
 	ip=0.0
@@ -147,7 +139,9 @@ def adjustcurrent(crange, ntry=injection_max_try):
 		
 	return ip
 
-def automated_measurement():
+## k=2.pi.a
+
+def wenner_measurement():
 	global resarr,boxarr,rrange
 	
 	firsttake=True
@@ -431,7 +425,7 @@ def measurebtn():
 				resarr[i][j]=(-1,-1,-1,-1)
 				
 		msrev.set()
-		msrthread_id=Thread(target=automated_measurement)
+		msrthread_id=Thread(target=wenner_measurement)
 		msrthread_id.start()
 		update_display()
 
