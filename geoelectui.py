@@ -359,16 +359,18 @@ def update_display():
 	
 	for p in proarr:
 		cvs.itemconfig(p['id'], fill='lavender')
+	try:
+		if pm:
+			cvs.itemconfig(proarr[pm-1]['id'], fill='brown')
+		if pp:
+			cvs.itemconfig(proarr[pp-1]['id'], fill='red')
+		if vm:
+			cvs.itemconfig(proarr[vm-1]['id'], fill='turquoise')
+		if vp:
+			cvs.itemconfig(proarr[vp-1]['id'], fill='turquoise')	
+	except:
+		pass
 		
-	if pm:
-		cvs.itemconfig(proarr[pm-1]['id'], fill='brown')
-	if pp:
-		cvs.itemconfig(proarr[pp-1]['id'], fill='red')
-	if vm:
-		cvs.itemconfig(proarr[vm-1]['id'], fill='turquoise')
-	if vp:
-		cvs.itemconfig(proarr[vp-1]['id'], fill='turquoise')	
-	
 	for i in range(len(resarr)):
 		for j in range(len(resarr[i])):
 			r=resarr[i][j][2]
