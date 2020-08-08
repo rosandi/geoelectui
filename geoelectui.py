@@ -19,6 +19,7 @@ WINW=800
 WINH=600
 WOFFS=0
 HOFFS=0
+CVSH=350
 
 colorcode=["#2E909D","#2D979E","#2D9F9F","#2CA09A","#2BA194","#2BA38E",
            "#2AA488","#29A582","#29A67B","#28A775","#27A96E","#27AA67",
@@ -33,10 +34,7 @@ colorcode=["#2E909D","#2D979E","#2D9F9F","#2CA09A","#2BA194","#2BA38E",
            "#FF5050","#FF5353","#FF5656","#FF5959","#FF5C5C"]
 
 # ----------- VARIABLES -----------
-boxofs=50
-boxski=125
-boxsz=40
-boxsep=5
+
 maxlayer=3
 msrthread_id=None
 msrev=Event()
@@ -78,6 +76,7 @@ for arg in sys.argv:
 boxarr=[] # box figure array (color, values, etc)
 proarr=[] # probe position (surface)
 resarr=[] # measured resistivity array
+probres=[] # interprobe resistances
 conarr=[] # probe configuration
 
 # dP+1==prob distance
@@ -86,14 +85,16 @@ conarr=[] # probe configuration
 # max dP: pmax<16
 
 def calcpoints():
-	global resarr,boxarr,conarr
+	global resarr,boxarr,conarr, probres
 		
+	probres=(g.NPROBE-1)*[(-1,-1,-1)]
 	dPmax=0
 	
 	while True:
 		if ((dPmax+1)*3) > g.NPROBE:
 			break
 		dPmax+=1
+		
 	nbox=g.NPROBE-3
 	
 	for dP in range(dPmax):
@@ -109,7 +110,7 @@ def calcpoints():
 		conarr.append({'conf': (pm,pp,vm,vp), 'nbox': nbox})
 		resarr.append(nbox*[(-1,-1,-1,-1, (0,0,0,0))])
 		nbox-=3
-
+	
 #for ar in boxarr:
 #	print(ar)
 
@@ -227,6 +228,28 @@ def automated_measurement():
 	g.flush()
 	msrev.clear()
 
+
+def measure_resistances():
+	global probres
+	g.discharge(10.0)
+	g.set_injection(injection_low_pwm)
+	g.probe(1,2,0,0)
+	for p in range(len(probres)):
+
+		if not msrev.is_set():
+			break
+			
+		I=g.measure_current()
+		V=g.measure_injection()
+		S=g.measure_shunt()
+		try:
+			probres[p]=((V+S)/I,V+S,I)
+		except:
+			probres[p]=(-1,-1,-1)
+		g.shift()
+		
+	msrev.clear()
+
 def saveData():
 	fl=open(filename_prefix+str(int(dt.timestamp(dt.now()))),'w')
 	fl.write('# geoelectric measurement data\n')
@@ -237,10 +260,26 @@ def saveData():
 		for b in a:
 			fl.write(str(b)+'\n')
 	fl.close()
+
+def saveRes():
+	fl=open(filename_prefix+'res-'+str(int(dt.timestamp(dt.now()))),'w')
+	fl.write('# resistance measurement data\n')
+	fl.write('# rosandi, 2020\n')
+	fl.write('# Geophysics Universitas Padjadjaran\n')
+	fl.write('# fields: P1 P2 R V I\n')
+	for a in range(len(probres)):
+		fl.write(str((a+1,a+2)+probres[a])+'\n')
+	fl.close()
+
 	
 ########################
 #### INTERFACE CODE ####
 ########################
+
+boxofs=50
+boxski=100
+boxsz=40
+boxsep=5
 
 mw=Tk()
 mw.title("GeoPhy Resistivity Meter")
@@ -252,7 +291,7 @@ DrawArea.grid(row=0,column=0,columnspan=2)
 CommandArea.grid(row=1,column=0,pady=10)
 ParamArea.grid(row=1,column=1,pady=10)
 
-cvs=Canvas(DrawArea,width=WINW,height=WINH-220,bg='white')
+cvs=Canvas(DrawArea,width=WINW,height=CVSH,bg='white')
 cvs.pack()
 
 dosave=IntVar()
@@ -266,7 +305,7 @@ def drawresmap():
 	global boxarr,proarr,ckeylow,ckeyhigh
 
 	bx=boxofs
-	by=0.7*boxski
+	by=boxski-35
 	prad=20
 
 	maxcol=g.NPROBE
@@ -274,8 +313,9 @@ def drawresmap():
 	# probe positions
 	for i in range(maxcol):
 		p=cvs.create_oval(bx,by,bx+prad,by+prad,fill='yellow')
+		r=cvs.create_text(bx+2*prad,by-prad,text='--',state=HIDDEN)
 		bx+=boxsz+boxsep
-		proarr.append({'id': p, 'color': 'yellow'})
+		proarr.append({'id': p, 'color': 'yellow', 'resid':r})
 
 	bxx=boxofs+3*boxsz/2-boxsep/2
 	by=boxski
@@ -292,9 +332,10 @@ def drawresmap():
 		boxarr.append(tarr)
 		by+=boxsz+boxsep
 		bxx+=3*boxsz/2 + boxsep
+		
 	
 	cbx=100
-	cby=WINH-250
+	cby=CVSH-30
 	
 	for c in colorcode:
 		cvs.create_rectangle(cbx,cby,cbx+5,cby+20,outline=c,fill=c)
@@ -345,7 +386,20 @@ def update_display():
 		if dosave.get():
 			saveData()
 			if dorep.get():
-				measurebtn()
+				measurebtn()	
+
+def update_resval():
+	for p in range(len(probres)):
+		if probres[p][0]>0:
+			cvs.itemconfig(proarr[p]['resid'],state=NORMAL,text='%0.0f'%(probres[p][0]))
+	
+	if msrev.is_set():
+		mw.after(100,update_resval)
+	else:
+		rmsr['text']='RESISTANCE'
+		enableWidget(entries+[bmsr,brun,bcali])
+		if dosave.get():
+			saveRes()
 
 ##### COMMANDS #####
 
@@ -388,19 +442,39 @@ def runcali():
 	cal=g.soft_calibrate(5)
 	print(cal)
 
-def commandButton(label, cmd, y):
+def resbtn():
+	global msrthread_id,probres
+	if msrev.is_set():
+		print("request to abort (res)...")
+		rmsr['text']='RESISTANCE'
+		msrev.clear()
+		enableWidget(entries+[bmsr,brun,bcali])
+	else:
+		enableWidget(entries+[bmsr,brun,bcali],False)	
+		rmsr['text']='CANCEL MEASUREMENT'	
+		msrev.set()
+		msrthread_id=Thread(target=measure_resistances)
+		msrthread_id.start()
+		update_resval()
+
+cmd_pos=0
+
+def commandButton(label, cmd):
+	global cmd_pos
 	bt=Button(CommandArea, text=label, command=cmd)
-	bt.grid(row=y,column=0,sticky='WE')
+	bt.grid(row=cmd_pos,column=0,sticky='WE')
+	cmd_pos+=1
 	return bt
 	
 # the buttons
 
-bmsr=commandButton('MEASURE',measurebtn,0)
-brun=commandButton('CHECK RELAY',runcheck,1)
-bcali=commandButton('CALIBRATE',runcali,2)
+bmsr=commandButton('MEASURE',measurebtn)
+rmsr=commandButton('RESISTANCE',resbtn)
+brun=commandButton('CHECK RELAY',runcheck)
+bcali=commandButton('CALIBRATE',runcali)
 
 fck=Frame(CommandArea)
-fck.grid(row=3,pady=10)
+fck.grid(row=cmd_pos,pady=10)
 Checkbutton(fck, text='Save Measurement Data',variable=dosave).grid(row=0,sticky='W')
 Checkbutton(fck, text='Loop Measurement',variable=dorep).grid(row=1,sticky='W')
 
@@ -409,13 +483,18 @@ buttons=[brun,bcali]
 #### PARAMS ####
 
 entries=[]
+entrie_pos=0
 
-def paramEntry(label,text,y):
-	Label(ParamArea,text=label).grid(row=y,column=0,sticky='W')
+def paramEntry(label,text,unit):
+	global entrie_pos
+	Label(ParamArea,text=label).grid(row=entrie_pos,column=0,sticky='W')
 	ent=Entry(ParamArea)
 	ent.insert(END,text)
-	ent.grid(row=y,column=1)
+	ent.grid(row=entrie_pos,column=1)
+	if unit != '':
+		Label(ParamArea,text=unit).grid(row=entrie_pos,column=2,sticky='W')
 	entries.append(ent)
+	entrie_pos+=1
 	return ent
 
 def apply_param():
@@ -434,17 +513,17 @@ def apply_param():
 	filename_prefix=entry_filename.get()
 
 # the entries
-entry_min_current=paramEntry('Current Low Limit ', "%0.3f"%(crange[0]),0)
-entry_max_current=paramEntry('Current High Limit ', "%0.3f"%(crange[1]),1)
-entry_max_volt=paramEntry('Voltage Limit ', '%0.3f'%(voltage_limit),2)
-entry_pwm_incr=paramEntry('PWM Increment ', str(injection_pwm_increment),3)
-entry_discharge_volt=paramEntry('Discharge Voltage ', '%0.3f'%(injection_volt_low),4)
-entry_imaxtry=paramEntry('Max Injection Try ', str(injection_max_try),5)
-entry_mmaxtry=paramEntry('Max Measurement Try ', str(max_measurement_try),6)
-entry_filename=paramEntry('File Prefix ', filename_prefix,7)
+entry_min_current=paramEntry('Current Low Limit ', "%0.3f"%(crange[0]),' mA')
+entry_max_current=paramEntry('Current High Limit ', "%0.3f"%(crange[1]),' mA')
+entry_max_volt=paramEntry('Voltage Limit ', '%0.2f'%(voltage_limit),' mV')
+entry_discharge_volt=paramEntry('Discharge Voltage ', '%0.3f'%(injection_volt_low),' V')
+entry_pwm_incr=paramEntry('PWM Increment ', str(injection_pwm_increment),'')
+entry_imaxtry=paramEntry('Max Injection Try ', str(injection_max_try),'')
+entry_mmaxtry=paramEntry('Max Measurement Try ', str(max_measurement_try),'')
+entry_filename=paramEntry('File Prefix ', filename_prefix,'')
 
 ebt=Button(ParamArea, text='APPLY PARAMETERS', command=apply_param)
-ebt.grid(row=8,column=0,columnspan=2,pady=10)
+ebt.grid(row=entrie_pos,column=0,columnspan=2,pady=10)
 entries.append(ebt)
 
 ##########################

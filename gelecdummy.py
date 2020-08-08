@@ -74,6 +74,7 @@ def decr_injection(n=1):
 
 def set_injection(ival):
 	send('v'+str(ival))
+	
 
 def set_naverage(navg):
 	if navg<1:
@@ -92,13 +93,16 @@ def soft_calibrate(n=5, verbose=False):
 	return "soft calibration"
 
 def measure_voltage():
-	return 0
+	return 1
 
 def measure_current():
 	return 1
 	
 def measure_injection():
-	return 0
+	return 1
+	
+def measure_shunt():
+	return 1
 	
 def measure_resistance():
 	try:
