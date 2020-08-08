@@ -38,6 +38,10 @@ colorcode=["#2E909D","#2D979E","#2D9F9F","#2CA09A","#2BA194","#2BA38E",
 maxlayer=3
 msrthread_id=None
 msrev=Event()
+pp=0
+pm=0
+vp=0
+vm=0
 
 ### TUNABLE PARAMETERS ###
 
@@ -143,16 +147,17 @@ def adjustcurrent(crange, ntry=injection_max_try):
 
 def wenner_measurement():
 	global resarr,boxarr,rrange
+	global pp,pm,vp,vm
 	
 	firsttake=True
 	
 	for prow in range(len(resarr)):
 		
 		pconf=conarr[prow]['conf']
-		aa=pconf[0]
-		bb=pconf[1]
-		cc=pconf[2]
-		dd=pconf[3]
+		pm=pconf[0]
+		pp=pconf[1]
+		vm=pconf[2]
+		vp=pconf[3]
 		v=0
 		ntry=0
 		
@@ -162,12 +167,12 @@ def wenner_measurement():
 			if not msrev.is_set():
 				break
 
-			print("probe conf: pm={} pp={} vm={} vp={}".format(aa,bb,cc,dd))
+			print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
 			
 			# measure self potential. FIXME! statistics
 			g.discharge(injection_volt_low,verbose=True)
 			
-			g.probe(0,0,cc,dd)
+			g.probe(0,0,vm,vp)
 			sv=g.measure_voltage()
 			
 			if ntry<max_measurement_try  and sv>=voltage_limit:
@@ -176,7 +181,7 @@ def wenner_measurement():
 				continue
 				
 			# injection
-			g.probe(aa,bb,cc,dd)
+			g.probe(pm,pp,vm,vp)
 			g.set_injection(injection_low_pwm)
 			g.inject()			
 			mi=0.0
@@ -194,7 +199,7 @@ def wenner_measurement():
 			
 			if mi!=0.0:
 				mr=np.abs((mv-sv)/mi)
-				resarr[prow][v]=(mv,mi,mr,sv,(aa,bb,cc,dd))
+				resarr[prow][v]=(mv,mi,mr,sv,(pm,pp,vm,vp))
 			
 			if firsttake:
 				rrange={'low':mr,'high':mr}
@@ -206,10 +211,10 @@ def wenner_measurement():
 					rrange['high']=mr
 									
 			print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
-			aa+=1
-			bb+=1
-			cc+=1
-			dd+=1
+			pm+=1
+			pp+=1
+			vm+=1
+			vp+=1
 			v+=1
 			ntry=0
 		
@@ -236,12 +241,15 @@ def measure_resistances():
 		I=g.measure_current()
 		V=g.measure_injection()
 		S=g.measure_shunt()
+		
 		try:
 			probres[p]=((V+S)/I,V+S,I)
 		except:
 			probres[p]=(-1,-1,-1)
+		print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
 		g.shift()
 		
+	g.probe_off()	
 	msrev.clear()
 
 def saveData():
@@ -306,10 +314,10 @@ def drawresmap():
 
 	# probe positions
 	for i in range(maxcol):
-		p=cvs.create_oval(bx,by,bx+prad,by+prad,fill='yellow')
-		r=cvs.create_text(bx+2*prad,by-prad,text='--',state=HIDDEN)
+		p=cvs.create_oval(bx,by,bx+prad,by+prad,fill='lavender')
+		r=cvs.create_text(bx+prad,by-prad,text='--',state=HIDDEN)
 		bx+=boxsz+boxsep
-		proarr.append({'id': p, 'color': 'yellow', 'resid':r})
+		proarr.append({'id': p, 'resid':r})
 
 	bxx=boxofs+3*boxsz/2-boxsep/2
 	by=boxski
@@ -347,6 +355,20 @@ def enableWidget(wlist, en=True): # wlist<-widget list
 			a['state']=DISABLED
 
 def update_display():
+	global pm,pp,vm,vp
+	
+	for p in proarr:
+		cvs.itemconfig(p['id'], fill='lavender')
+		
+	if pm:
+		cvs.itemconfig(proarr[pm-1]['id'], fill='brown')
+	if pp:
+		cvs.itemconfig(proarr[pp-1]['id'], fill='red')
+	if vm:
+		cvs.itemconfig(proarr[vm-1]['id'], fill='turquoise')
+	if vp:
+		cvs.itemconfig(proarr[vp-1]['id'], fill='turquoise')	
+	
 	for i in range(len(resarr)):
 		for j in range(len(resarr[i])):
 			r=resarr[i][j][2]
@@ -376,6 +398,12 @@ def update_display():
 		mw.after(100,update_display)
 	else:
 		bmsr['text']='MEASURE'
+		for p in proarr:
+			cvs.itemconfig(p['id'], fill='lavender')
+		pm=0
+		pp=0
+		vm=0
+		vp=0
 		enableWidget(entries+buttons)
 		if dosave.get():
 			saveData()
@@ -385,7 +413,7 @@ def update_display():
 def update_resval():
 	for p in range(len(probres)):
 		if probres[p][0]>0:
-			cvs.itemconfig(proarr[p]['resid'],state=NORMAL,text='%0.0f'%(probres[p][0]))
+			cvs.itemconfig(proarr[p]['resid'],state=NORMAL,text='%0.1f'%(probres[p][0]))
 	
 	if msrev.is_set():
 		mw.after(100,update_resval)
@@ -444,7 +472,8 @@ def resbtn():
 		msrev.clear()
 		enableWidget(entries+[bmsr,brun,bcali])
 	else:
-		enableWidget(entries+[bmsr,brun,bcali],False)	
+		enableWidget(entries+[bmsr,brun,bcali],False)
+		probres=(g.NPROBE-1)*[(-1,-1,-1)]
 		rmsr['text']='CANCEL MEASUREMENT'	
 		msrev.set()
 		msrthread_id=Thread(target=measure_resistances)
@@ -472,7 +501,7 @@ fck.grid(row=cmd_pos,pady=10)
 Checkbutton(fck, text='Save Measurement Data',variable=dosave).grid(row=0,sticky='W')
 Checkbutton(fck, text='Loop Measurement',variable=dorep).grid(row=1,sticky='W')
 
-buttons=[brun,bcali]
+buttons=[rmsr,brun,bcali]
 
 #### PARAMS ####
 
@@ -528,7 +557,7 @@ entries.append(ebt)
 try:
 	g.init(comm,speed)
 	print('calibrating...')
-	print('calibration parameters: ', g.soft_calibrate(verbose=True))
+	print('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
 except:
 	import gelecdummy as g
 	g.init('null')
