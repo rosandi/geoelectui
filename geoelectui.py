@@ -63,7 +63,8 @@ gfactor=1.0
 # macOS: /dev/cu.wchusbserial1420
 # Linux: /dev/ttyUSB0 or /dev/ttyACM0
 
-comm='/dev/ttyUSB0'
+comm='COM5'
+#comm='/dev/ttyUSB0'
 speed=9600
 
 for arg in sys.argv:
@@ -170,8 +171,8 @@ def wenner_measurement():
 			print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
 			
 			# measure self potential. FIXME! statistics
-			g.discharge(injection_volt_low,verbose=True)
-			
+			print(g.discharge(injection_volt_low,verbose=True))
+			sleep(0.5)
 			g.probe(0,0,vm,vp)
 			sv=g.measure_voltage()
 			
@@ -181,9 +182,12 @@ def wenner_measurement():
 				continue
 				
 			# injection
+			g.inject(False)
+			sleep(0.5)
 			g.probe(pm,pp,vm,vp)
 			g.set_injection(injection_low_pwm)
-			g.inject()			
+			g.inject()
+			sleep(0.5)
 			mi=0.0
 #			mi=adjustcurrent(crange,ntry=10)
 			mi=adjustcurrent(crange)
@@ -237,7 +241,7 @@ def measure_resistances():
 
 		if not msrev.is_set():
 			break
-			
+		
 		I=g.measure_current()
 		V=g.measure_injection()
 		S=g.measure_shunt()
@@ -247,7 +251,10 @@ def measure_resistances():
 		except:
 			probres[p]=(-1,-1,-1)
 		print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
+		g.inject(False)
+		sleep(0.2)
 		g.shift()
+		g.inject()
 		
 	g.probe_off()	
 	msrev.clear()
