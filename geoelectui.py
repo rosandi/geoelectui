@@ -91,196 +91,196 @@ conarr=[] # probe configuration
 # max dP: pmax<16
 
 def calcpoints():
-	global resarr,boxarr,conarr, probres
-		
-	probres=(g.NPROBE-1)*[(-1,-1,-1)]
-	dPmax=0
-	
-	while True:
-		if ((dPmax+1)*3) > g.NPROBE:
-			break
-		dPmax+=1
-		
-	nbox=g.NPROBE-3
-	
-	for dP in range(dPmax):
-		
-		if (dP>maxlayer):
-			break
-			
-		pm=1
-		pp=(dP+1)*3+1
-		vm=pm+dP+1
-		vp=vm+dP+1
-		
-		conarr.append({'conf': (pm,pp,vm,vp), 'nbox': nbox})
-		resarr.append(nbox*[(-1,-1,-1,-1, (0,0,0,0))])
-		nbox-=3
+    global resarr,boxarr,conarr, probres
+        
+    probres=(g.NPROBE-1)*[(-1,-1,-1)]
+    dPmax=0
+    
+    while True:
+        if ((dPmax+1)*3) > g.NPROBE:
+            break
+        dPmax+=1
+        
+    nbox=g.NPROBE-3
+    
+    for dP in range(dPmax):
+        
+        if (dP>maxlayer):
+            break
+            
+        pm=1
+        pp=(dP+1)*3+1
+        vm=pm+dP+1
+        vp=vm+dP+1
+        
+        conarr.append({'conf': (pm,pp,vm,vp), 'nbox': nbox})
+        resarr.append(nbox*[(-1,-1,-1,-1, (0,0,0,0))])
+        nbox-=3
 
 def adjustcurrent(crange, ntry=injection_max_try):
-	ip=0.0
-	nt=0
-		
-	while not (ip>crange[0] and ip<crange[1]):	
-		if not msrev.is_set():
-			break
-	
-		ip=g.measure_current();
-		if ip<crange[0]:
-			g.incr_injection(injection_pwm_increment)
-		elif ip>crange[1]:
-			g.decr_injection(injection_pwm_increment)
-		vol=g.measure_injection()
-		
-		if vol>injection_volt_limit:
-			break
-			
-		print("injection: %0.4fmA at %0.3fV (curr_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
-		
-		nt+=1
-		if nt>ntry:
-			print("max try number reached")
-			break
-		
-	return ip
+    ip=0.0
+    nt=0
+        
+    while not (ip>crange[0] and ip<crange[1]):  
+        if not msrev.is_set():
+            break
+    
+        ip=g.measure_current();
+        if ip<crange[0]:
+            g.incr_injection(injection_pwm_increment)
+        elif ip>crange[1]:
+            g.decr_injection(injection_pwm_increment)
+        vol=g.measure_injection()
+        
+        if vol>injection_volt_limit:
+            break
+            
+        print("injection: %0.4fmA at %0.3fV (curr_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
+        
+        nt+=1
+        if nt>ntry:
+            print("max try number reached")
+            break
+        
+    return ip
 
 ## k=2.pi.a
 
 def wenner_measurement():
-	global resarr,boxarr,rrange
-	global pp,pm,vp,vm
-	
-	firsttake=True
-	
-	for prow in range(len(resarr)):
-		
-		pconf=conarr[prow]['conf']
-		pm=pconf[0]
-		pp=pconf[1]
-		vm=pconf[2]
-		vp=pconf[3]
-		v=0
-		ntry=0
-		
-		while v < len(resarr[prow]):
-#		for v in range(len(resarr[prow])):
+    global resarr,boxarr,rrange
+    global pp,pm,vp,vm
+    
+    firsttake=True
+    
+    for prow in range(len(resarr)):
+        
+        pconf=conarr[prow]['conf']
+        pm=pconf[0]
+        pp=pconf[1]
+        vm=pconf[2]
+        vp=pconf[3]
+        v=0
+        ntry=0
+        
+        while v < len(resarr[prow]):
+#       for v in range(len(resarr[prow])):
 
-			if not msrev.is_set():
-				break
+            if not msrev.is_set():
+                break
 
-			print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
-			
-			# measure self potential. FIXME! statistics
-			print(g.discharge(injection_volt_low,verbose=True))
-			sleep(0.5)
-			g.probe(0,0,vm,vp)
-			sv=g.measure_voltage()
-			
-			if ntry<max_measurement_try  and sv>=voltage_limit:
-				ntry+=1
-				print('bad probe contact (V_self).. retrying..')
-				continue
-				
-			# injection
-			g.inject(False)
-			sleep(0.5)
-			g.probe(pm,pp,vm,vp)
-			g.set_injection(injection_low_pwm)
-			g.inject()
-			sleep(0.5)
-			mi=0.0
-#			mi=adjustcurrent(crange,ntry=10)
-			mi=adjustcurrent(crange)
+            print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
+            
+            # measure self potential. FIXME! statistics
+            print(g.discharge(injection_volt_low,verbose=True))
+            sleep(0.5)
+            g.probe(0,0,vm,vp)
+            sv=g.measure_voltage()
+            
+            if ntry<max_measurement_try  and sv>=voltage_limit:
+                ntry+=1
+                print('bad probe contact (V_self).. retrying..')
+                continue
+                
+            # injection
+            g.inject(False)
+            sleep(0.5)
+            g.probe(pm,pp,vm,vp)
+            g.set_injection(injection_low_pwm)
+            g.inject()
+            sleep(0.5)
+            mi=0.0
+#           mi=adjustcurrent(crange,ntry=10)
+            mi=adjustcurrent(crange)
 
-			mv=g.measure_voltage()
-			
-			if ntry<max_measurement_try and mv>=voltage_limit:
-				ntry+=1
-				print('bad probe contact.. retrying...')
-				continue
-			
-			mr=-1
-			
-			if mi!=0.0:
-				mr=np.abs((mv-sv)/mi)
-				resarr[prow][v]=(mv,mi,mr,sv,(pm,pp,vm,vp))
-			
-			if firsttake:
-				rrange={'low':mr,'high':mr}
-				firsttake=False
-			else:
-				if rrange['low']>mr:
-					rrange['low']=mr
-				if rrange['high']<mr:
-					rrange['high']=mr
-									
-			print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
-			pm+=1
-			pp+=1
-			vm+=1
-			vp+=1
-			v+=1
-			ntry=0
-		
-		if not msrev.is_set():
-			print("measurement aborted")
-			break
-		
-	g.probe_off()	# turn off relays
-	g.discharge(injection_volt_low)
-	g.flush()
-	msrev.clear()
+            mv=g.measure_voltage()
+            
+            if ntry<max_measurement_try and mv>=voltage_limit:
+                ntry+=1
+                print('bad probe contact.. retrying...')
+                continue
+            
+            mr=-1
+            
+            if mi!=0.0:
+                mr=np.abs((mv-sv)/mi)
+                resarr[prow][v]=(mv,mi,mr,sv,(pm,pp,vm,vp))
+            
+            if firsttake:
+                rrange={'low':mr,'high':mr}
+                firsttake=False
+            else:
+                if rrange['low']>mr:
+                    rrange['low']=mr
+                if rrange['high']<mr:
+                    rrange['high']=mr
+                                    
+            print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
+            pm+=1
+            pp+=1
+            vm+=1
+            vp+=1
+            v+=1
+            ntry=0
+        
+        if not msrev.is_set():
+            print("measurement aborted")
+            break
+        
+    g.probe_off()   # turn off relays
+    g.discharge(injection_volt_low)
+    g.flush()
+    msrev.clear()
 
 
 def measure_resistances():
-	global probres
-	g.discharge(10.0)
-	g.set_injection(injection_low_pwm)
-	g.probe(1,2,0,0)
-	for p in range(len(probres)):
+    global probres
+    g.discharge(10.0)
+    g.set_injection(injection_low_pwm)
+    g.probe(1,2,0,0)
+    for p in range(len(probres)):
 
-		if not msrev.is_set():
-			break
-		
-		I=g.measure_current()
-		V=g.measure_injection()
-		S=g.measure_shunt()
-		
-		try:
-			probres[p]=((V+S)/I,V+S,I)
-		except:
-			probres[p]=(-1,-1,-1)
-		print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
-		g.inject(False)
-		sleep(0.2)
-		g.shift()
-		g.inject()
-		
-	g.probe_off()	
-	msrev.clear()
+        if not msrev.is_set():
+            break
+        
+        I=g.measure_current()
+        V=g.measure_injection()
+        S=g.measure_shunt()
+        
+        try:
+            probres[p]=((V+S)/I,V+S,I)
+        except:
+            probres[p]=(-1,-1,-1)
+        print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
+        g.inject(False)
+        sleep(0.2)
+        g.shift()
+        g.inject()
+        
+    g.probe_off()   
+    msrev.clear()
 
 def saveData():
-	fl=open(filename_prefix+str(int(dt.timestamp(dt.now()))),'w')
-	fl.write('# geoelectric measurement data\n')
-	fl.write('# rosandi, 2020\n')
-	fl.write('# Geophysics Universitas Padjadjaran\n')
-	fl.write('# fields: volt curr res vself conf\n')
-	for a in resarr:
-		for b in a:
-			fl.write(str(b)+'\n')
-	fl.close()
+    fl=open(filename_prefix+str(int(dt.timestamp(dt.now()))),'w')
+    fl.write('# geoelectric measurement data\n')
+    fl.write('# rosandi, 2020\n')
+    fl.write('# Geophysics Universitas Padjadjaran\n')
+    fl.write('# fields: volt curr res vself conf\n')
+    for a in resarr:
+        for b in a:
+            fl.write(str(b)+'\n')
+    fl.close()
 
 def saveRes():
-	fl=open(filename_prefix+'res-'+str(int(dt.timestamp(dt.now()))),'w')
-	fl.write('# resistance measurement data\n')
-	fl.write('# rosandi, 2020\n')
-	fl.write('# Geophysics Universitas Padjadjaran\n')
-	fl.write('# fields: P1 P2 R V I\n')
-	for a in range(len(probres)):
-		fl.write(str((a+1,a+2)+probres[a])+'\n')
-	fl.close()
+    fl=open(filename_prefix+'res-'+str(int(dt.timestamp(dt.now()))),'w')
+    fl.write('# resistance measurement data\n')
+    fl.write('# rosandi, 2020\n')
+    fl.write('# Geophysics Universitas Padjadjaran\n')
+    fl.write('# fields: P1 P2 R V I\n')
+    for a in range(len(probres)):
+        fl.write(str((a+1,a+2)+probres[a])+'\n')
+    fl.close()
 
-	
+    
 ########################
 #### INTERFACE CODE ####
 ########################
@@ -311,193 +311,193 @@ ckeylow=None
 ckeyhigh=None
 
 def drawresmap():
-	global boxarr,proarr,ckeylow,ckeyhigh
+    global boxarr,proarr,ckeylow,ckeyhigh
 
-	bx=boxofs
-	by=boxski-35
-	prad=20
+    bx=boxofs
+    by=boxski-35
+    prad=20
 
-	maxcol=g.NPROBE
+    maxcol=g.NPROBE
 
-	# probe positions
-	for i in range(maxcol):
-		p=cvs.create_oval(bx,by,bx+prad,by+prad,fill='lavender')
-		r=cvs.create_text(bx+prad,by-prad,text='--',state=HIDDEN)
-		bx+=boxsz+boxsep
-		proarr.append({'id': p, 'resid':r})
+    # probe positions
+    for i in range(maxcol):
+        p=cvs.create_oval(bx,by,bx+prad,by+prad,fill='lavender')
+        r=cvs.create_text(bx+prad,by-prad,text='--',state=HIDDEN)
+        bx+=boxsz+boxsep
+        proarr.append({'id': p, 'resid':r})
 
-	bxx=boxofs+3*boxsz/2-boxsep/2
-	by=boxski
-	
-	for p in conarr:
-		bx=bxx
-		tarr=[]
+    bxx=boxofs+3*boxsz/2-boxsep/2
+    by=boxski
+    
+    for p in conarr:
+        bx=bxx
+        tarr=[]
 
-		for i in range(p['nbox']):
-			b=cvs.create_rectangle(bx,by,bx+boxsz,by+boxsz,fill='gray')
-			tarr.append({'id': b,'color': 'gray'})
-			bx+=boxsz+boxsep
+        for i in range(p['nbox']):
+            b=cvs.create_rectangle(bx,by,bx+boxsz,by+boxsz,fill='gray')
+            tarr.append({'id': b,'color': 'gray'})
+            bx+=boxsz+boxsep
 
-		boxarr.append(tarr)
-		by+=boxsz+boxsep
-		bxx+=3*boxsz/2 + boxsep
-		
-	
-	cbx=100
-	cby=CVSH-30
-	
-	for c in colorcode:
-		cvs.create_rectangle(cbx,cby,cbx+5,cby+20,outline=c,fill=c)
-		cbx+=5
+        boxarr.append(tarr)
+        by+=boxsz+boxsep
+        bxx+=3*boxsz/2 + boxsep
+        
+    
+    cbx=100
+    cby=CVSH-30
+    
+    for c in colorcode:
+        cvs.create_rectangle(cbx,cby,cbx+5,cby+20,outline=c,fill=c)
+        cbx+=5
 
-	ckeylow=cvs.create_text(75,cby+10,text='%0.2f'%(rrange['low']),fill=colorcode[0])
-	ckeyhigh=cvs.create_text(460,cby+10,text='%0.2f'%(rrange['high']),fill=colorcode[64])
-	
+    ckeylow=cvs.create_text(75,cby+10,text='%0.2f'%(rrange['low']),fill=colorcode[0])
+    ckeyhigh=cvs.create_text(460,cby+10,text='%0.2f'%(rrange['high']),fill=colorcode[64])
+    
 def enableWidget(wlist, en=True): # wlist<-widget list
-	if en:
-		for a in wlist:
-			a['state']=NORMAL
-	else:
-		for a in wlist:
-			a['state']=DISABLED
+    if en:
+        for a in wlist:
+            a['state']=NORMAL
+    else:
+        for a in wlist:
+            a['state']=DISABLED
 
 def update_display():
-	global pm,pp,vm,vp
-	
-	for p in proarr:
-		cvs.itemconfig(p['id'], fill='lavender')
-	try:
-		if pm:
-			cvs.itemconfig(proarr[pm-1]['id'], fill='brown')
-		if pp:
-			cvs.itemconfig(proarr[pp-1]['id'], fill='red')
-		if vm:
-			cvs.itemconfig(proarr[vm-1]['id'], fill='turquoise')
-		if vp:
-			cvs.itemconfig(proarr[vp-1]['id'], fill='turquoise')	
-	except:
-		pass
-		
-	for i in range(len(resarr)):
-		for j in range(len(resarr[i])):
-			r=resarr[i][j][2]
-			if r==-1:
-				continue
-				
-			if rrange['low'] >= rrange['high']:
-				c=32
-			else:
-				c=int(len(colorcode)*(r-rrange['low'])/(rrange['high']-rrange['low']))
-				
-			if c>64:
-				c=64
-				
-			boxarr[i][j]['color']=colorcode[c]
+    global pm,pp,vm,vp
+    
+    for p in proarr:
+        cvs.itemconfig(p['id'], fill='lavender')
+    try:
+        if pm:
+            cvs.itemconfig(proarr[pm-1]['id'], fill='brown')
+        if pp:
+            cvs.itemconfig(proarr[pp-1]['id'], fill='red')
+        if vm:
+            cvs.itemconfig(proarr[vm-1]['id'], fill='turquoise')
+        if vp:
+            cvs.itemconfig(proarr[vp-1]['id'], fill='turquoise')    
+    except:
+        pass
+        
+    for i in range(len(resarr)):
+        for j in range(len(resarr[i])):
+            r=resarr[i][j][2]
+            if r==-1:
+                continue
+                
+            if rrange['low'] >= rrange['high']:
+                c=32
+            else:
+                c=int(len(colorcode)*(r-rrange['low'])/(rrange['high']-rrange['low']))
+                
+            if c>64:
+                c=64
+                
+            boxarr[i][j]['color']=colorcode[c]
 
-	for b in boxarr:
-		for v in b:
-			cvs.itemconfig(v['id'],fill=v['color'])
-	
-	cvs.itemconfig(ckeylow,text='%0.2f'%(rrange['low']))
-	cvs.itemconfig(ckeyhigh,text='%0.2f'%(rrange['high']))
-	
-	cvs.update_idletasks()
+    for b in boxarr:
+        for v in b:
+            cvs.itemconfig(v['id'],fill=v['color'])
+    
+    cvs.itemconfig(ckeylow,text='%0.2f'%(rrange['low']))
+    cvs.itemconfig(ckeyhigh,text='%0.2f'%(rrange['high']))
+    
+    cvs.update_idletasks()
 
-	if msrev.is_set():
-		mw.after(100,update_display)
-	else:
-		bmsr['text']='MEASURE'
-		for p in proarr:
-			cvs.itemconfig(p['id'], fill='lavender')
-		pm=0
-		pp=0
-		vm=0
-		vp=0
-		enableWidget(entries+buttons)
-		if dosave.get():
-			saveData()
-			if dorep.get():
-				measurebtn()	
+    if msrev.is_set():
+        mw.after(100,update_display)
+    else:
+        bmsr['text']='MEASURE'
+        for p in proarr:
+            cvs.itemconfig(p['id'], fill='lavender')
+        pm=0
+        pp=0
+        vm=0
+        vp=0
+        enableWidget(entries+buttons)
+        if dosave.get():
+            saveData()
+            if dorep.get():
+                measurebtn()    
 
 def update_resval():
-	for p in range(len(probres)):
-		if probres[p][0]>0:
-			cvs.itemconfig(proarr[p]['resid'],state=NORMAL,text='%0.1f'%(probres[p][0]))
-	
-	if msrev.is_set():
-		mw.after(100,update_resval)
-	else:
-		rmsr['text']='RESISTANCE'
-		enableWidget(entries+[bmsr,brun,bcali])
-		if dosave.get():
-			saveRes()
+    for p in range(len(probres)):
+        if probres[p][0]>0:
+            cvs.itemconfig(proarr[p]['resid'],state=NORMAL,text='%0.1f'%(probres[p][0]))
+    
+    if msrev.is_set():
+        mw.after(100,update_resval)
+    else:
+        rmsr['text']='RESISTANCE'
+        enableWidget(entries+[bmsr,brun,bcali])
+        if dosave.get():
+            saveRes()
 
 ##### COMMANDS #####
 
 # measurement button functions
 
 def measurebtn():
-	global msrthread_id, resarr
-	
-	if msrev.is_set():
-		print("request to abort...")
-		bmsr['text']='MEASURE'
-		dorep.set(0)
-		msrev.clear()
-		enableWidget(entries+buttons)
-		
-	else:
-		enableWidget(entries+buttons,False)
-		apply_param()
-		bmsr['text']='STOP MEASUREMENT'
-		for b in boxarr:
-			for v in b:
-				v['color']='gray'
-				cvs.itemconfig(v['id'],fill=v['color'])
+    global msrthread_id, resarr
+    
+    if msrev.is_set():
+        print("request to abort...")
+        bmsr['text']='MEASURE'
+        dorep.set(0)
+        msrev.clear()
+        enableWidget(entries+buttons)
+        
+    else:
+        enableWidget(entries+buttons,False)
+        apply_param()
+        bmsr['text']='STOP MEASUREMENT'
+        for b in boxarr:
+            for v in b:
+                v['color']='gray'
+                cvs.itemconfig(v['id'],fill=v['color'])
 
-		cvs.update_idletasks()
+        cvs.update_idletasks()
 
-		for i in range(len(resarr)):
-			for j in range(len(resarr[i])):
-				resarr[i][j]=(-1,-1,-1,-1)
-				
-		msrev.set()
-		msrthread_id=Thread(target=wenner_measurement)
-		msrthread_id.start()
-		update_display()
+        for i in range(len(resarr)):
+            for j in range(len(resarr[i])):
+                resarr[i][j]=(-1,-1,-1,-1)
+                
+        msrev.set()
+        msrthread_id=Thread(target=wenner_measurement)
+        msrthread_id.start()
+        update_display()
 
 def runcheck():
-	g.send('R')
+    g.send('R')
 
 def runcali():
-	cal=g.soft_calibrate(5)
-	print(cal)
+    cal=g.soft_calibrate(5)
+    print(cal)
 
 def resbtn():
-	global msrthread_id,probres
-	if msrev.is_set():
-		print("request to abort (res)...")
-		rmsr['text']='RESISTANCE'
-		msrev.clear()
-		enableWidget(entries+[bmsr,brun,bcali])
-	else:
-		enableWidget(entries+[bmsr,brun,bcali],False)
-		probres=(g.NPROBE-1)*[(-1,-1,-1)]
-		rmsr['text']='CANCEL MEASUREMENT'	
-		msrev.set()
-		msrthread_id=Thread(target=measure_resistances)
-		msrthread_id.start()
-		update_resval()
+    global msrthread_id,probres
+    if msrev.is_set():
+        print("request to abort (res)...")
+        rmsr['text']='RESISTANCE'
+        msrev.clear()
+        enableWidget(entries+[bmsr,brun,bcali])
+    else:
+        enableWidget(entries+[bmsr,brun,bcali],False)
+        probres=(g.NPROBE-1)*[(-1,-1,-1)]
+        rmsr['text']='CANCEL MEASUREMENT'   
+        msrev.set()
+        msrthread_id=Thread(target=measure_resistances)
+        msrthread_id.start()
+        update_resval()
 
 cmd_pos=0
 
 def commandButton(label, cmd):
-	global cmd_pos
-	bt=Button(CommandArea, text=label, command=cmd)
-	bt.grid(row=cmd_pos,column=0,sticky='WE')
-	cmd_pos+=1
-	return bt
-	
+    global cmd_pos
+    bt=Button(CommandArea, text=label, command=cmd)
+    bt.grid(row=cmd_pos,column=0,sticky='WE')
+    cmd_pos+=1
+    return bt
+    
 # the buttons
 
 bmsr=commandButton('MEASURE',measurebtn)
@@ -518,31 +518,31 @@ entries=[]
 entrie_pos=0
 
 def paramEntry(label,text,unit):
-	global entrie_pos
-	Label(ParamArea,text=label).grid(row=entrie_pos,column=0,sticky='W')
-	ent=Entry(ParamArea)
-	ent.insert(END,text)
-	ent.grid(row=entrie_pos,column=1)
-	if unit != '':
-		Label(ParamArea,text=unit).grid(row=entrie_pos,column=2,sticky='W')
-	entries.append(ent)
-	entrie_pos+=1
-	return ent
+    global entrie_pos
+    Label(ParamArea,text=label).grid(row=entrie_pos,column=0,sticky='W')
+    ent=Entry(ParamArea)
+    ent.insert(END,text)
+    ent.grid(row=entrie_pos,column=1)
+    if unit != '':
+        Label(ParamArea,text=unit).grid(row=entrie_pos,column=2,sticky='W')
+    entries.append(ent)
+    entrie_pos+=1
+    return ent
 
 def apply_param():
-	global crange, injection_pwm_increment, injection_volt_low
-	global voltage_limit
-	
-	c0=float(entry_min_current.get())
-	c1=float(entry_max_current.get())
-	crange=(c0,c1)
-	
-	voltage_limit=float(entry_max_volt.get())
-	injection_pwm_increment=int(entry_pwm_incr.get())
-	injection_volt_low=float(entry_discharge_volt.get())
-	injection_max_try=int(entry_imaxtry.get())
-	max_measurement_try=int(entry_mmaxtry.get())
-	filename_prefix=entry_filename.get()
+    global crange, injection_pwm_increment, injection_volt_low
+    global voltage_limit
+    
+    c0=float(entry_min_current.get())
+    c1=float(entry_max_current.get())
+    crange=(c0,c1)
+    
+    voltage_limit=float(entry_max_volt.get())
+    injection_pwm_increment=int(entry_pwm_incr.get())
+    injection_volt_low=float(entry_discharge_volt.get())
+    injection_max_try=int(entry_imaxtry.get())
+    max_measurement_try=int(entry_mmaxtry.get())
+    filename_prefix=entry_filename.get()
 
 # the entries
 entry_min_current=paramEntry('Current Low Limit ', "%0.3f"%(crange[0]),' mA')
@@ -564,12 +564,12 @@ entries.append(ebt)
 
 # don't forget to initialize first
 try:
-	g.init(comm,speed)
-	print('calibrating...')
-	print('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
+    g.init(comm,speed)
+    print('calibrating...')
+    print('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
 except:
-	import gelecdummy as g
-	g.init('null')
+    import gelecdummy as g
+    g.init('null')
 
 g.set_naverage(20)
 calcpoints()
