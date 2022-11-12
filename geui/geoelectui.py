@@ -43,6 +43,9 @@ pm=0
 vp=0
 vm=0
 
+# device settings
+nprobe=15
+
 ### TUNABLE PARAMETERS ###
 
 rrange={'low':10.0,'high':10.0}
@@ -231,6 +234,93 @@ def wenner_measurement():
     g.flush()
     msrev.clear()
 
+def custom_measurement(cfgname):
+    '''read configuration from file'''
+
+    with open(cfgname) as fl:
+        pc=json.load(fl)
+
+    if pc['nprobe'] != nprobe:
+        print('incompatible configuration')
+        return
+    
+    pts=[]
+    rv={}
+
+    for p in pc['conf']:
+        if not msrev.is_set(): break;
+        pts.append(p[0])
+
+        pm=p[1][0]
+        pp=p[1][1]
+        vm=p[1][2]
+        vp=p[1][3]
+
+        print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
+        
+        # measure self potential. FIXME! statistics
+        print(g.discharge(injection_volt_low,verbose=True))
+        sleep(0.5)
+        g.probe(0,0,vm,vp)
+        sv=g.measure_voltage()
+        
+        if ntry<max_measurement_try  and sv>=voltage_limit:
+            ntry+=1
+            print('bad probe contact (V_self).. retrying..')
+            continue
+            
+        # injection
+        g.inject(False)
+        sleep(0.5)
+
+        g.probe(pm,pp,vm,vp)
+        g.set_injection(injection_low_pwm)
+        g.inject()
+        sleep(0.5)
+        
+        mi=0.0
+        mi=adjustcurrent(crange)
+        mv=g.measure_voltage()
+        
+        if ntry<max_measurement_try and mv>=voltage_limit:
+            ntry+=1
+            print('bad probe contact.. retrying...')
+            continue
+        
+        mr=-1
+        
+        if mi!=0.0:
+            mr=np.abs((mv-sv)/mi)
+        else:
+            mr=nan
+
+        resarr[tuple(p[0])]=(p[0], [mv,mi,mr,sv])
+        
+        if firsttake:
+            rrange={'low':mr,'high':mr}
+            firsttake=False
+        else:
+            if rrange['low']>mr:
+                rrange['low']=mr
+            if rrange['high']<mr:
+                rrange['high']=mr
+                                
+        print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
+        pm+=1
+        pp+=1
+        vm+=1
+        vp+=1
+        v+=1
+        ntry=0
+    
+    if not msrev.is_set():
+        print("measurement aborted")
+        break
+        
+    g.probe_off()   # turn off relays
+    g.discharge(injection_volt_low)
+    g.flush()
+    msrev.clear()
 
 def measure_resistances():
     global probres
