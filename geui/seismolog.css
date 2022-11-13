@@ -1,0 +1,100 @@
+QMainWindow {
+  margin: 0;
+  font-family: Arial;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+QMessageBox {
+  font-size: 16px;
+}
+
+QMenuBar {
+  font-size:20px;
+}
+
+QMenuBar::item {
+  padding-right:20px;
+  padding-left:20px;
+  /*padding-bottom:10px;*/
+}
+
+QMenu {
+  font-size: 20px;
+}
+
+QPushButton {
+  padding:10px;
+  font-size: 16px; 
+  font-weight: bold;
+}
+/*
+QPushButton::hover {
+  background-color: #888;
+}
+QPushButton::indicator {
+    width: 30px;
+    height: 30px;
+}
+QPushButton:disabled{
+  background-color: yellow;
+}
+*/
+QPushButton#cmdButton {
+  background-color: #000080;
+  color: white;
+  border: 1px solid white;
+  outline: none;
+  text-align: center;
+  font-size: 28px; 
+  font-weight: bold;
+  border-radius: 10px;
+}
+
+QPushButton#cmdButton::hover {
+  background-color: #3B86F2;
+}
+
+QTextEdit {
+  background-color: lightgray;
+  font-size: 14px;
+  color:black;
+}
+
+QLabel#bigLabel {
+  font-size: 16px; 
+  font-weight: bold;
+  color:teal;
+}
+
+QCheckBox#plain {
+  color: teal;
+  font-size: 16px; 
+  font-weight: bold;
+  padding-left:10px;
+}
+
+QCheckBox#bigCheck {
+  color: blue;
+  text-align: center;
+  font-size: 16px; 
+  font-weight: bold;
+  padding-left:20px;
+  border-radius: 10px;
+}
+QCheckBox#bigCheck::hover {
+  color: white;
+  background-color: #3B86F2;
+}
+
+QCheckBox#bigCheck::indicator {
+  width:20px;
+  height:20px;
+}
+
+QListWidget {
+    font-size: 20px;
+    color: lightgray;
+    line-height:30px;
+}
+

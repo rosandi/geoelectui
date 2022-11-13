@@ -143,7 +143,10 @@ def measureloop(pm,pp,vm,vp,avg=20,rep=0):
                 
     except:
         pass
-    
+
+def close():
+    pass
+
 def display():
     send('e 0 0 %clear')
     send('e 0 0 Resistivity Meter')

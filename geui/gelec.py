@@ -21,10 +21,14 @@ def flush():
     rs=''
     for ss in s:
         rs=rs+ss.decode().replace('\r','')
+    
+    while ser.in_waiting:
+        ser.read()
+
     return rs
 
 def send(scmd):
-    ser.write(bytes(scmd+'\n','ascii'))
+    ser.write(bytes(scmd+' ','ascii'))
     return flush()
     
 # pp: plus injection probe
@@ -192,6 +196,9 @@ def display():
     send('e 0 0 Resistivity Meter')
     send('e 0 1 GeoPhy Instrument')
     send('e 0 2 Univ. Padjadjaran ')
+
+def close():
+    flush()
 
 def init(sdev,speed=9600):
     global ser

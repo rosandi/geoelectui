@@ -60,6 +60,7 @@ max_measurement_try=10
 repeat_measurement=1
 filename_prefix='data-'
 gfactor=1.0
+nan=float('nan');
 
 ##### COMMAND LINE PARAMETERS ####
 #
@@ -86,39 +87,6 @@ boxarr=[] # box figure array (color, values, etc)
 proarr=[] # probe position (surface)
 resarr=[] # measured resistivity array
 probres=[] # interprobe resistances
-conarr=[] # probe configuration
-
-# dP+1==prob distance
-# dP=0 pMax=3, dp=1 pMax=6, 9, 12
-# pmax=(dP+1)*3
-# max dP: pmax<16
-
-def calcpoints():
-    global resarr,boxarr,conarr, probres
-        
-    probres=(g.NPROBE-1)*[(-1,-1,-1)]
-    dPmax=0
-    
-    while True:
-        if ((dPmax+1)*3) > g.NPROBE:
-            break
-        dPmax+=1
-        
-    nbox=g.NPROBE-3
-    
-    for dP in range(dPmax):
-        
-        if (dP>maxlayer):
-            break
-            
-        pm=1
-        pp=(dP+1)*3+1
-        vm=pm+dP+1
-        vp=vm+dP+1
-        
-        conarr.append({'conf': (pm,pp,vm,vp), 'nbox': nbox})
-        resarr.append(nbox*[(-1,-1,-1,-1, (0,0,0,0))])
-        nbox-=3
 
 def adjustcurrent(crange, ntry=injection_max_try):
     ip=0.0
@@ -147,93 +115,6 @@ def adjustcurrent(crange, ntry=injection_max_try):
         
     return ip
 
-## k=2.pi.a
-
-def wenner_measurement():
-    global resarr,boxarr,rrange
-    global pp,pm,vp,vm
-    
-    firsttake=True
-    
-    for prow in range(len(resarr)):
-        
-        pconf=conarr[prow]['conf']
-        pm=pconf[0]
-        pp=pconf[1]
-        vm=pconf[2]
-        vp=pconf[3]
-        v=0
-        ntry=0
-        
-        while v < len(resarr[prow]):
-#       for v in range(len(resarr[prow])):
-
-            if not msrev.is_set():
-                break
-
-            print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
-            
-            # measure self potential. FIXME! statistics
-            print(g.discharge(injection_volt_low,verbose=True))
-            sleep(0.5)
-            g.probe(0,0,vm,vp)
-            sv=g.measure_voltage()
-            
-            if ntry<max_measurement_try  and sv>=voltage_limit:
-                ntry+=1
-                print('bad probe contact (V_self).. retrying..')
-                continue
-                
-            # injection
-            g.inject(False)
-            sleep(0.5)
-            g.probe(pm,pp,vm,vp)
-            g.set_injection(injection_low_pwm)
-            g.inject()
-            sleep(0.5)
-            mi=0.0
-#           mi=adjustcurrent(crange,ntry=10)
-            mi=adjustcurrent(crange)
-
-            mv=g.measure_voltage()
-            
-            if ntry<max_measurement_try and mv>=voltage_limit:
-                ntry+=1
-                print('bad probe contact.. retrying...')
-                continue
-            
-            mr=-1
-            
-            if mi!=0.0:
-                mr=np.abs((mv-sv)/mi)
-                resarr[prow][v]=(mv,mi,mr,sv,(pm,pp,vm,vp))
-            
-            if firsttake:
-                rrange={'low':mr,'high':mr}
-                firsttake=False
-            else:
-                if rrange['low']>mr:
-                    rrange['low']=mr
-                if rrange['high']<mr:
-                    rrange['high']=mr
-                                    
-            print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
-            pm+=1
-            pp+=1
-            vm+=1
-            vp+=1
-            v+=1
-            ntry=0
-        
-        if not msrev.is_set():
-            print("measurement aborted")
-            break
-        
-    g.probe_off()   # turn off relays
-    g.discharge(injection_volt_low)
-    g.flush()
-    msrev.clear()
-
 def custom_measurement(cfgname):
     '''read configuration from file'''
 
@@ -248,7 +129,11 @@ def custom_measurement(cfgname):
     rv={}
 
     for p in pc['conf']:
-        if not msrev.is_set(): break;
+
+        if not msrev.is_set(): 
+            print('measurement aborted')
+            break;
+
         pts.append(p[0])
 
         pm=p[1][0]
@@ -287,12 +172,10 @@ def custom_measurement(cfgname):
             print('bad probe contact.. retrying...')
             continue
         
-        mr=-1
-        
         if mi!=0.0:
             mr=np.abs((mv-sv)/mi)
         else:
-            mr=nan
+            mr=float('nan')
 
         resarr[tuple(p[0])]=(p[0], [mv,mi,mr,sv])
         
@@ -306,17 +189,8 @@ def custom_measurement(cfgname):
                 rrange['high']=mr
                                 
         print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
-        pm+=1
-        pp+=1
-        vm+=1
-        vp+=1
-        v+=1
         ntry=0
     
-    if not msrev.is_set():
-        print("measurement aborted")
-        break
-        
     g.probe_off()   # turn off relays
     g.discharge(injection_volt_low)
     g.flush()
@@ -327,6 +201,7 @@ def measure_resistances():
     g.discharge(10.0)
     g.set_injection(injection_low_pwm)
     g.probe(1,2,0,0)
+
     for p in range(len(probres)):
 
         if not msrev.is_set():
@@ -339,7 +214,7 @@ def measure_resistances():
         try:
             probres[p]=((V+S)/I,V+S,I)
         except:
-            probres[p]=(-1,-1,-1)
+            probres[p]=(nan,nan,nan)
         print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
         g.inject(False)
         sleep(0.2)
@@ -662,7 +537,6 @@ except:
     g.init('null')
 
 g.set_naverage(20)
-calcpoints()
 drawresmap()
 
 mw.mainloop()
