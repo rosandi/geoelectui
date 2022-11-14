@@ -14,6 +14,9 @@ import sys
 ser=None
 NPROBE=16
 READY=False
+WAIT=0.5
+WAIT2=2
+
 current_offset=0.0
 
 def flush():

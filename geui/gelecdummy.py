@@ -9,9 +9,12 @@
 
 from time import sleep
 import sys
+from random import random as rnd
 
 NPROBE=16
 READY=False
+WAIT=0
+WAIT2=0
 current_offset=0.0
 
 def flush():
@@ -57,11 +60,11 @@ def probe(pm,pp,vm,vp):
     spp=''.join(spp)
     ss='p'+svp+svm+spp+spm  
     send('q')
-    sleep(0.5)
+    sleep(0.1)
     send(ss)
     
 def measure():
-    return 0,0,0,0
+    return rnd(),rnd(),rnd(),rnd()
     
 def shift():
     send('s 0 1')
@@ -93,20 +96,20 @@ def soft_calibrate(n=5, verbose=False):
     return "soft calibration"
 
 def measure_voltage():
-    return 1
+    return rnd()
 
 def measure_current():
-    return 1
+    return rnd()
     
 def measure_injection():
-    return 1
+    return 10*rnd()
     
 def measure_shunt():
-    return 1
+    return 10*rnd()
     
 def measure_resistance():
     try:
-        return 1000.0*measure_injection()/measure_current()
+        return measure_injection()/measure_current()
     except:
         return -1.0
 

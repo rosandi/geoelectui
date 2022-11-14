@@ -15,7 +15,7 @@ import sys
 from threading import Thread, Event
 import gelec as g
 
-WINW=800
+WINW=1024
 WINH=600
 WOFFS=0
 HOFFS=0
@@ -313,10 +313,6 @@ def custom_measurement(cfgname):
         v+=1
         ntry=0
     
-    if not msrev.is_set():
-        print("measurement aborted")
-        break
-        
     g.probe_off()   # turn off relays
     g.discharge(injection_volt_low)
     g.flush()

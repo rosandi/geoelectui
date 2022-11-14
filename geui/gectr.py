@@ -10,8 +10,8 @@
 from time import sleep
 from datetime import datetime as dt
 import sys
+import numpy as np
 from threading import Thread, Event
-import gelec as g
 
 # ----------- VARIABLES -----------
 
@@ -23,23 +23,20 @@ pm=0
 vp=0
 vm=0
 
-# device settings
-nprobe=15
-
 ### TUNABLE PARAMETERS ###
 
-rrange={'low':10.0,'high':10.0}
-crange=(0.025,50.0)
-injection_low_pwm=20
-injection_pwm_increment=5
-injection_volt_limit=200
-injection_volt_low=15
-injection_max_try=50
-voltage_limit=4966.0
-max_measurement_try=10
-repeat_measurement=1
-filename_prefix='data-'
-gfactor=1.0
+devcfg = {
+    'crange': (0.025,50.0),
+    'injection_low_pwm': 20,
+    'injection_pwm_increment': 5,
+    'injection_volt_limit': 200,
+    'injection_volt_low': 15,
+    'injection_max_try': 50,
+    'voltage_limit': 4966.0,
+    'max_measurement_try': 10,
+    'filename_prefix': 'data-',
+}
+
 nan=float('nan');
 
 ##### COMMAND LINE PARAMETERS ####
@@ -54,9 +51,12 @@ speed=9600
 boxarr=[] # box figure array (color, values, etc)
 proarr=[] # probe position (surface)
 resarr={} # measured resistivity array
-probres=[] # interprobe resistances
+probres={} # interprobe resistances
+rmin=0
+rmax=0
+firsttake=True
 
-def adjustcurrent(crange, ntry=injection_max_try):
+def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
     ip=0.0
     nt=0
         
@@ -66,12 +66,12 @@ def adjustcurrent(crange, ntry=injection_max_try):
     
         ip=g.measure_current();
         if ip<crange[0]:
-            g.incr_injection(injection_pwm_increment)
+            g.incr_injection(devcfg['injection_pwm_increment'])
         elif ip>crange[1]:
-            g.decr_injection(injection_pwm_increment)
+            g.decr_injection(devcfg['injection_pwm_increment'])
         vol=g.measure_injection()
         
-        if vol>injection_volt_limit:
+        if vol>devcfg['injection_volt_limit']:
             break
             
         print("injection: %0.4fmA at %0.3fV (curr_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
@@ -83,109 +83,122 @@ def adjustcurrent(crange, ntry=injection_max_try):
         
     return ip
 
-def custom_measurement(cfgname):
-    '''read configuration from file'''
+def set_conf(cfg):
+    global pconf,resarr, probres, firsttake
 
-    with open(cfgname) as fl:
-        pc=json.load(fl)
+    pconf=cfg
+    firsttake=True
 
-    if pc['nprobe'] != nprobe:
-        print('incompatible configuration')
-        return
-    
-    pts=[]
     resarr={}
 
-    for p in pc['conf']:
+    for p in pconf['conf']:
         resarr[tuple(p[0])]=(p[0], None)
 
-    for p in pc['conf']:
+    for p in range(1,pconf['nprobe']):
+        '''probres format: (resistance, injection_voltage, injection_current)'''
+        probres[p,p+1]=None
+
+def custom_measurement():  # pc is the probe configuration dict
+    '''read configuration from file'''
+
+    global rmin,rmax, pm,pp,vm,vp
+    
+    if not pconf: return
+
+    # clear previous measurement data
+    for p in resarr:
+        resarr[p]=(p, None)
+
+    if pconf['nprobe'] != g.NPROBE:
+        print('incompatible configuration: probe {} <-> {}'.format(pconf['nprobe'], nprobe))
+        return
+    
+    rmin,rmax=0,0
+
+    for p in pconf['conf']:
 
         if not msrev.is_set(): 
             print('measurement aborted')
             break;
-
-        pts.append(p[0])
 
         pm=p[1][0]
         pp=p[1][1]
         vm=p[1][2]
         vp=p[1][3]
 
-        print("probe conf: pm={} pp={} vm={} vp={}".format(pm,pp,vm,vp))
+        print("> {} probe conf: pm={} pp={} vm={} vp={}".format(p[0],pm,pp,vm,vp))
         
         # measure self potential. FIXME! statistics
-        print(g.discharge(injection_volt_low,verbose=True))
-        sleep(0.5)
+        g.discharge(devcfg['injection_volt_low'],verbose=True)
+        sleep(g.WAIT)
         g.probe(0,0,vm,vp)
         sv=g.measure_voltage()
         
-        if ntry<max_measurement_try  and sv>=voltage_limit:
+        ntry=0
+        if ntry<devcfg['max_measurement_try'] and sv>=devcfg['voltage_limit']:
             ntry+=1
             print('bad probe contact (V_self).. retrying..')
             continue
             
         # injection
         g.inject(False)
-        sleep(0.5)
+        sleep(g.WAIT)
 
         g.probe(pm,pp,vm,vp)
-        g.set_injection(injection_low_pwm)
+        g.set_injection(devcfg['injection_low_pwm'])
         g.inject()
-        sleep(0.5)
+        sleep(g.WAIT)
         
         mi=0.0
-        mi=adjustcurrent(crange)
+        mi=adjustcurrent(devcfg['crange'])
         mv=g.measure_voltage()
-        
-        if ntry<max_measurement_try and mv>=voltage_limit:
+
+        ntry=0
+        if ntry<devcfg['max_measurement_try'] and mv>=devcfg['voltage_limit']:
             ntry+=1
             print('bad probe contact.. retrying...')
             continue
         
         if mi!=0.0:
             mr=np.abs((mv-sv)/mi)
+            if rmin>mr: rmin=mr
+            if rmax<mr: rmax=mr
         else:
             mr=float('nan')
 
         resarr[tuple(p[0])]=(p[0], [mv,mi,mr,sv])
-        
-        if firsttake:
-            rrange={'low':mr,'high':mr}
-            firsttake=False
-        else:
-            if rrange['low']>mr:
-                rrange['low']=mr
-            if rrange['high']<mr:
-                rrange['high']=mr
-                                
         print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
-        ntry=0
     
     g.probe_off()   # turn off relays
-    g.discharge(injection_volt_low)
+    g.discharge(devcfg['injection_volt_low'])
     g.flush()
+    pm,pp,vm,vp=0,0,0,0
     msrev.clear()
 
 def measure_resistances():
     global probres
-    g.discharge(10.0)
-    g.set_injection(injection_low_pwm)
-    g.probe(1,2,0,0)
 
-    for p in range(len(probres)):
+    for pr in probres:
+        probres[pr]=None
+    
+    for p in range(1, pconf['nprobe']):
 
-        if not msrev.is_set():
-            break
+        if not msrev.is_set(): break
+        
+        g.discharge(10.0)
+        sleep(g.WAIT2)
+        g.set_injection(devcfg['injection_low_pwm'])
+        g.probe(p,p+1,0,0)
         
         I=g.measure_current()
         V=g.measure_injection()
         S=g.measure_shunt()
         
         try:
-            probres[p]=((V+S)/I,V+S,I)
+            probres[p,p+1]=((V+S)/I,V+S,I)
         except:
-            probres[p]=(nan,nan,nan)
+            probres[p,p+1]=(nan,V+S,I)
+
         print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
         g.inject(False)
         sleep(0.2)
@@ -195,28 +208,59 @@ def measure_resistances():
     g.probe_off()   
     msrev.clear()
 
+def resmap(p, clr):
+    nn=len(clr)
+    
+    if rmax == rmin:
+        return 0
+    
+    vv=resarr[p][1]
+    if vv:
+        c=1+int(nn*(vv[2]-rmin)/(rmax-rmin))
+    else:
+        c=0
+
+    # just in case
+    if c<0: c=0
+    if c>=nn: c=nn-1
+    return c
+
 def saveData():
-    fl=open(filename_prefix+str(int(dt.timestamp(dt.now()))),'w')
-    fl.write('# geoelectric measurement data\n')
-    fl.write('# rosandi, 2020\n')
-    fl.write('# Geophysics Universitas Padjadjaran\n')
-    fl.write('# fields: volt curr res vself conf\n')
+    fl=open(devcfg['filename_prefix']+str(int(dt.timestamp(dt.now()))),'w')
+    
+    jdata={'comment':'Geoelectric measurement data\nrosandi, 2020'+
+            'Geophysics Universitas Padjadjaran\n'+
+            'fields: volt curr res vself conf'}
+
     for a in resarr:
         for b in a:
             fl.write(str(b)+'\n')
     fl.close()
 
+   
 def saveRes():
-    fl=open(filename_prefix+'res-'+str(int(dt.timestamp(dt.now()))),'w')
+    fl=open(devcfg['filename_prefix']+'res-'+str(int(dt.timestamp(dt.now()))),'w')
     fl.write('# resistance measurement data\n')
     fl.write('# rosandi, 2020\n')
     fl.write('# Geophysics Universitas Padjadjaran\n')
-    fl.write('# fields: P1 P2 R V I\n')
     for a in range(len(probres)):
         fl.write(str((a+1,a+2)+probres[a])+'\n')
     fl.close()
 
-    
+def init_dev(comm,speed):
+    global g
+
+    try:
+        import gelec as g
+        g.init(comm,speed)
+        print('calibrating...')
+        print('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
+    except:
+        import gelecdummy as g
+        g.init('null')
+
+    g.set_naverage(20)
+
 ##########################
 ###### MAIN PROGRAM ######
 ##########################
@@ -229,21 +273,14 @@ if __name__ == "__main__":
         if arg.find('speed=') == 0:
             speed=int(arg.replace('speed=',''))
 
-    # don't forget to initialize first
-    try:
-        g.init(comm,speed)
-        print('calibrating...')
-        print('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
-    except:
-        import gelecdummy as g
-        g.init('null')
-
-    g.set_naverage(20)
-
     if not comm:
         print("arguments required: comm=[comm-port]")
         exit(-1)
     
+    init_dev(comm, speed)
+
+     # don't forget to initialize first
+   
     try:
         while True:
             cmdln=input('GE-CTR > ')
