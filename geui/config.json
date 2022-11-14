@@ -1,0 +1,11 @@
+{
+    "crange": [0.25,100.0],
+    "injection_low_pwm": 20,
+    "injection_pwm_increment": 5,
+    "injection_volt_limit": 200,
+    "injection_volt_low": 15,
+    "injection_max_try": 50,
+    "voltage_limit": 4966.0,
+    "max_measurement_try": 10,
+    "filename_prefix": "data-"
+}
