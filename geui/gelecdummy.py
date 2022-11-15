@@ -17,6 +17,9 @@ WAIT=0
 WAIT2=0
 current_offset=0.0
 
+def plog(s):
+    print(s)
+
 def flush():
     return "ok"
 
@@ -142,7 +145,7 @@ def measureloop(pm,pp,vm,vp,avg=20,rep=0):
                 vv[1]+=v[1]
                 vv[2]+=v[2]
                 vv[3]+=v[3]
-            print(vv[0]/avg,vv[1]/avg,vv[2]/avg,vv[3]/avg)
+            plog(f'{vv[0]/avg}, {vv[1]/avg}, {vv[2]/avg}, {vv[3]/avg}')
                 
     except:
         pass

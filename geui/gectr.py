@@ -11,6 +11,7 @@ from time import sleep
 from datetime import datetime as dt
 import sys
 import numpy as np
+from math import isnan
 from threading import Thread, Event
 
 # ----------- VARIABLES -----------
@@ -55,6 +56,12 @@ probres={} # interprobe resistances
 rmin=0
 rmax=0
 firsttake=True
+logstring=''
+
+def plog(s):
+    global logstring
+    logstring+='\n'+s
+    print(s)
 
 def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
     ip=0.0
@@ -74,11 +81,11 @@ def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
         if vol>devcfg['injection_volt_limit']:
             break
             
-        print("injection: %0.4fmA at %0.3fV (curr_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
+        plog("injection: %0.4fmA at %0.3fV (curr_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
         
         nt+=1
         if nt>ntry:
-            print("max try number reached")
+            plog("max try number reached")
             break
         
     return ip
@@ -110,7 +117,7 @@ def custom_measurement():  # pc is the probe configuration dict
         resarr[p]=(p, None)
 
     if pconf['nprobe'] != g.NPROBE:
-        print('incompatible configuration: probe {} <-> {}'.format(pconf['nprobe'], nprobe))
+        plog('incompatible configuration: probe {} <-> {}'.format(pconf['nprobe'], nprobe))
         return
     
     rmin,rmax=1e6,0
@@ -118,7 +125,7 @@ def custom_measurement():  # pc is the probe configuration dict
     for p in pconf['conf']:
 
         if not msrev.is_set(): 
-            print('measurement aborted')
+            plog('measurement aborted')
             break;
 
         pm=p[1][0]
@@ -126,7 +133,7 @@ def custom_measurement():  # pc is the probe configuration dict
         vm=p[1][2]
         vp=p[1][3]
 
-        print("> {} probe conf: pm={} pp={} vm={} vp={}".format(p[0],pm,pp,vm,vp))
+        plog("> {} probe conf: pm={} pp={} vm={} vp={}".format(p[0],pm,pp,vm,vp))
         
         # measure self potential. FIXME! statistics
         g.discharge(devcfg['injection_volt_low'],verbose=True)
@@ -137,7 +144,7 @@ def custom_measurement():  # pc is the probe configuration dict
         ntry=0
         if ntry<devcfg['max_measurement_try'] and sv>=devcfg['voltage_limit']:
             ntry+=1
-            print('bad probe contact (V_self).. retrying..')
+            plog('bad probe contact (V_self).. retrying..')
             continue
             
         # injection
@@ -156,7 +163,7 @@ def custom_measurement():  # pc is the probe configuration dict
         ntry=0
         if ntry<devcfg['max_measurement_try'] and mv>=devcfg['voltage_limit']:
             ntry+=1
-            print('bad probe contact.. retrying...')
+            plog('bad probe contact.. retrying...')
             continue
         
         if mi!=0.0:
@@ -167,7 +174,7 @@ def custom_measurement():  # pc is the probe configuration dict
             mr=float('nan')
 
         resarr[tuple(p[0])]=(p[0], [mv,mi,mr,sv])
-        print("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
+        plog("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
     
     g.probe_off()   # turn off relays
     g.discharge(devcfg['injection_volt_low'])
@@ -199,7 +206,7 @@ def measure_resistances():
         except:
             probres[p,p+1]=(nan,V+S,I)
 
-        print('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
+        plog('I=%0.4f V=%0.4f S=%0.2f'%(I,V,S))
         g.inject(False)
         sleep(0.2)
         g.shift()
@@ -216,7 +223,10 @@ def resmap(p, clr):
     
     vv=resarr[p][1]
     if vv:
-        c=1+int(nn*(vv[2]-rmin)/(rmax-rmin))
+        if not isnan(vv[2]):
+            c=1+int(nn*(vv[2]-rmin)/(rmax-rmin))
+        else:
+            c=0
     else:
         c=0
 
@@ -247,19 +257,20 @@ def saveRes():
         fl.write(str((a+1,a+2)+probres[a])+'\n')
     fl.close()
 
-def init_dev(comm,speed):
+def init_dev(comm,speed,logger=None):
     global g
 
     try:
         import gelec as g
         g.init(comm,speed)
-        print('calibrating...')
-        print('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
+        plog('calibrating...')
+        plog('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
     except:
         import gelecdummy as g
         g.init('null')
-
+    
     g.set_naverage(20)
+    g.plog=plog
 
 ##########################
 ###### MAIN PROGRAM ######

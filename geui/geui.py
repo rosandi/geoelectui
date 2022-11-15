@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, QRect, QTimer
 from PyQt5.QtWidgets import (
         QWidget, QApplication, QScrollArea, 
         QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, 
-        QPushButton, QDialog, QFileDialog, QLineEdit
+        QPushButton, QDialog, QFileDialog, QLineEdit, QPlainTextEdit
         )
 
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush, QPen
@@ -43,6 +43,29 @@ for arg in sys.argv:
 
 css='seismolog.css'
 with open(css) as c: css=c.read()
+
+
+class logWindow(QWidget):
+    def __init__(_,master):
+        super(logWindow,_).__init__(master)
+        fn=QFont()
+        fn.setPointSize(8)
+        _.logtext=QPlainTextEdit(_)
+        _.logtext.setReadOnly(True)
+        _.logtext.setFont(fn)
+        lyo=QVBoxLayout()
+        lyo.addWidget(_.logtext)
+        _.setGeometry(QRect(600, 400, 400, 120))
+        _.setLayout(lyo)
+        _.hide()
+
+    def setText(_,txt):
+        _.logtext.setPlainText(txt)
+        mm=_.logtext.verticalScrollBar().maximum()
+        _.logtext.verticalScrollBar().setValue(mm);
+
+    def clear(_):
+        _.logtext.clear()
 
 class setDialog(QDialog):
     def __init__(_,master):
@@ -299,16 +322,16 @@ class Controls(QFrame):
         _.createControls()
 
     def createControls(_):
-        cfg=cmdButton('Probes Conf', _.master.probeconf)
-        acq=cmdButton('Acquire', _.master.doacq)
-        res=cmdButton('Resistance', _.master.dores)
-        sett=cmdButton('Settings', _.master.doset)
+        _.master.cfg=cmdButton('Probe Conf', _.master.probeconf)
+        _.master.acq=cmdButton('Acquire', _.master.doacq)
+        _.master.res=cmdButton('Resistance', _.master.dores)
+        _.master.sett=cmdButton('Settings', _.master.doset)
 
         lyo=QHBoxLayout()
-        lyo.addWidget(cfg)
-        lyo.addWidget(acq)
-        lyo.addWidget(res)
-        lyo.addWidget(sett)
+        lyo.addWidget(_.master.cfg)
+        lyo.addWidget(_.master.acq)
+        lyo.addWidget(_.master.res)
+        lyo.addWidget(_.master.sett)
         _.setLayout(lyo)
 
 class GEWin(QWidget):
@@ -323,6 +346,7 @@ class GEWin(QWidget):
         _.uptimer=QTimer()
         _.uptimer.timeout.connect(_.update)
         _.createGadgets()
+        _.logwin=logWindow(_)
         _.show()
 
     def createGadgets(_):
@@ -334,32 +358,54 @@ class GEWin(QWidget):
         lyo.addWidget(Controls(_),1)
         _.setLayout(lyo)
 
+    def grayButton(_,doit):
+        doit=not doit
+        _.acq.setEnabled(doit)
+        _.res.setEnabled(doit)
+        _.sett.setEnabled(doit)
+
     def update(_):
         _.canvas.repaint()
+        _.logwin.setText(gc.logstring)
         
+
         if not gc.msrev.is_set():
             _.uptimer.stop()
+            _.cfg.setText('Probe Conf')
+            _.grayButton(False)
+            _.logwin.hide()
 
     def probeconf(_):
-        fnm=QFileDialog.getOpenFileName(_, 'Open probe configuration', filter='*.json')
-        fnm=fnm[0]
-        if fnm =='': return
+        if gc.msrev.is_set():
+            gc.msrev.clear()
+            #_.cfg.setText('Probe Conf')
+            #_.grayButton(False)
 
-        with open(fnm) as fl:
-            pc=json.load(fl)
-        
-        _.pconf=pc
-        gc.set_conf(_.pconf)
-        _.canvas.repaint()
+        else:
+            fnm=QFileDialog.getOpenFileName(_, 'Open probe configuration', filter='*.json')
+            fnm=fnm[0]
+            if fnm =='': return
+
+            with open(fnm) as fl:
+                pc=json.load(fl)
+            
+            _.pconf=pc
+            gc.set_conf(_.pconf)
+            _.canvas.repaint()
 
     def doacq(_):
         if(_.pconf==None): 
             _.probeconf()
         
+        _.cfg.setText('&CANCEL')
+        _.grayButton(True)
+
         gc.msrev.set()
+        _.logwin.show()  # FIXME
+        _.logwin.clear()
+
         trid=Thread(target=gc.custom_measurement)
         trid.start()
-
         _.uptimer.start(100)
 
 
@@ -367,12 +413,13 @@ class GEWin(QWidget):
         if(_.pconf==None): 
             _.probeconf()
 
+        _.cfg.setText('&CANCEL')
+        _.grayButton(True)
         gc.msrev.set()
         trid=Thread(target=gc.measure_resistances)
         trid.start()
 
         _.uptimer.start(100)
-
 
     def doset(_):
         print('acquisition settings')
