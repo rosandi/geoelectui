@@ -30,7 +30,7 @@ devcfg = {
     'crange': (0.025,50.0),
     'injection_low_pwm': 20,
     'injection_pwm_increment': 5,
-    'injection_volt_limit': 200,
+    'injection_volt_limit': 400,
     'injection_volt_low': 15,
     'injection_max_try': 50,
     'voltage_limit': 4966.0,
@@ -45,8 +45,7 @@ nan=float('nan');
 # macOS: /dev/cu.wchusbserial1420
 # Linux: /dev/ttyUSB0 or /dev/ttyACM0
 
-comm='COM5'
-#comm='/dev/ttyUSB0'
+comm='/dev/ttyUSB0'
 speed=9600
 
 boxarr=[] # box figure array (color, values, etc)
@@ -261,15 +260,22 @@ def saveRes():
         fl.write(str((a+1,a+2)+probres[a])+'\n')
     fl.close()
 
-def init_dev(comm,speed,logger=None):
+def init_dev(comm,speed,cal=True):
     global g
 
     try:
+        plog('initialize...')
         import gelec as g
         g.init(comm,speed)
-        plog('calibrating...')
-        plog('calibration parameters: ', g.soft_calibrate(n=5,verbose=True))
-    except:
+        
+        if cal:
+            plog('calibrating...')
+            plog(f'calibration parameters:  {g.soft_calibrate(n=5,verbose=True)}')
+
+        plog('device ready')
+    
+    except Exception as e:
+        print(e)
         import gelecdummy as g
         g.init('null')
     
@@ -292,7 +298,7 @@ if __name__ == "__main__":
         print("arguments required: comm=[comm-port]")
         exit(-1)
     
-    init_dev(comm, speed)
+    init_dev(comm, speed, cal=False)
 
      # don't forget to initialize first
    
@@ -303,6 +309,13 @@ if __name__ == "__main__":
             if cmdln.find('q') == 0:
                 g.close()
                 break
+            
+            elif cmdln.find('probe')==0:
+                prb=cmdln.split()
+                if len(prb)==5:
+                    g.probe(int(prb[1]), int(prb[2]), int(prb[3]), int(prb[4]))
+                else:
+                    g.probe_off()
 
             elif cmdln.find('conf') == 0:
                 confile=cmdln.replace('conf=','')
@@ -313,10 +326,22 @@ if __name__ == "__main__":
             elif cmdln.find('mres') == 0:
                 measure_resistance()
 
-            else:
-                print('send command directly to device')
-                pass
+            elif cmdln.find('discharge')==0:
+                g.discharge(0,ntry=10,verbose=True)
 
+            elif cmdln.find('inject')==0:
+                cmdln=cmdln.split()
+                if 'off' in cmdln:
+                    g.inject(False)
+                else:
+                    g.inject(True)
+
+            elif cmdln.find('flush')==0:
+                print(g.flush())
+
+            else:
+                print(f'send "{cmdln}" to device')
+                print(g.send(cmdln))
                    
     except KeyboardInterrupt:
         print('terminating')

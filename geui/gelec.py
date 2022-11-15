@@ -14,27 +14,19 @@ import sys
 ser=None
 NPROBE=16
 READY=False
+current_offset=0.0
 WAIT=0.5
 WAIT2=2
-
-current_offset=0.0
-
-def plog(s):
-    print(s)
 
 def flush():
     s=ser.readlines()
     rs=''
     for ss in s:
         rs=rs+ss.decode().replace('\r','')
-    
-    while ser.in_waiting:
-        ser.read()
-
     return rs
 
 def send(scmd):
-    ser.write(bytes(scmd+' ','ascii'))
+    ser.write(bytes(scmd+'\n','ascii'))
     return flush()
     
 # pp: plus injection probe
@@ -108,21 +100,15 @@ def inject(stat=True):
     else:
         send('D')
 
-def discharge(minvolt, minpwm=5, ntry=30, verbose=False):
+def discharge(minvolt, minpwm=5, verbose=False):
     set_injection(minpwm)
     send('D')
     vlow=measure_injection()
-    tt=0
     while vlow > minvolt:
         vlow=measure_injection()
         if verbose:
-            plog("discharging: %0.3fV"%(vlow))
+            print("discharging: %0.3fV"%(vlow))
         sleep(1)
-
-        if tt>ntry:
-            plog(f"not reaching min volt after {tt} tries")
-            plot(f"stop at {vlow} volt")
-            break
     
     return ("discharged: %0.3fV"%(vlow))
 
@@ -155,7 +141,7 @@ def soft_calibrate(n=10, verbose=False):
         cu+=a
         sh+=b
         if verbose:
-            plog(a,b)
+            print(a,b)
     cu=cu/n
     sh=sh/n
     send("c %0.4f %0.4f 0"%(cu,sh))
@@ -198,7 +184,7 @@ def measureloop(pm,pp,vm,vp,avg=20,rep=0):
                 vv[1]+=v[1]
                 vv[2]+=v[2]
                 vv[3]+=v[3]
-            plog(f'{vv[0]/avg}, {vv[1]/avg}, {vv[2]/avg}, {vv[3]/avg}')
+            print(vv[0]/avg,vv[1]/avg,vv[2]/avg,vv[3]/avg)
                 
     except:
         pass
@@ -209,9 +195,6 @@ def display():
     send('e 0 1 GeoPhy Instrument')
     send('e 0 2 Univ. Padjadjaran ')
 
-def close():
-    flush()
-
 def init(sdev,speed=9600):
     global ser
     try:
@@ -220,6 +203,10 @@ def init(sdev,speed=9600):
         # display()
         READY=True
     except:
-        plog(f'CAN NOT OPEN DEVICE! {sdev}')
+        print('CAN NOT OPEN DEVICE! ',sdev)
         
     return flush()
+
+def close():
+    flush()
+
