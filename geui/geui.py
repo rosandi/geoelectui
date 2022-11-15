@@ -8,8 +8,8 @@ from PyQt5.QtCore import Qt, QRect, QTimer
 
 from PyQt5.QtWidgets import (
         QWidget, QApplication, QScrollArea, 
-        QFrame, QVBoxLayout, QHBoxLayout, QPushButton,
-        QFileDialog
+        QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, 
+        QPushButton, QDialog, QFileDialog, QLineEdit
         )
 
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush, QPen
@@ -44,6 +44,87 @@ for arg in sys.argv:
 css='seismolog.css'
 with open(css) as c: css=c.read()
 
+class setDialog(QDialog):
+    def __init__(_,master):
+        super(setDialog,_).__init__(master)
+        _.create()
+        _.exec_()
+
+    def applysettings(_):
+        try:
+            newcfg = {
+                    'crange': (float(_.ecrangemin.text()), float(_.ecrangemax.text())),
+                    'injection_low_pwm': int(_.einlow.text()),
+                    'injection_pwm_increment': int(_.eininc.text()),
+                    'injection_volt_limit': float(_.einvhi.text()),
+                    'injection_volt_low': float(_.einvlo.text()),
+                    'injection_max_try': int(_.eintry.text()),
+                    'voltage_limit': float(_.evlim.text()),
+                    'max_measurement_try': int(_.emtry.text()),
+                    'filename_prefix': _.eprefix.text()
+                    }
+
+            gc.devcfg=newcfg
+        
+        except Exception as e:
+            print(e)
+            return False
+
+        return True
+
+    def savesettings(_):
+        if _.applysettings():
+            fnm=QFileDialog.getSaveFileName(_, 'Save Configuration', filter='*.json')
+            fnm=fnm[0]
+            if fnm:
+                with open(fnm,'w') as fl:
+                    json.dump(gc.devcfg,fl)
+                _.close()
+
+    def create(_):
+        _.setWindowTitle("GE Settings")
+        _.ecrangemin=QLineEdit(f"{gc.devcfg['crange'][0]}")
+        _.ecrangemax=QLineEdit(f"{gc.devcfg['crange'][1]}")
+        _.einlow=QLineEdit(f"{gc.devcfg['injection_low_pwm']}")
+        _.eininc=QLineEdit(f"{gc.devcfg['injection_pwm_increment']}")
+        _.einvhi=QLineEdit(f"{gc.devcfg['injection_volt_limit']}")
+        _.einvlo=QLineEdit(f"{gc.devcfg['injection_volt_low']}")
+        _.eintry=QLineEdit(f"{gc.devcfg['injection_max_try']}")
+        _.evlim=QLineEdit(f"{gc.devcfg['voltage_limit']}")
+        _.emtry=QLineEdit(f"{gc.devcfg['max_measurement_try']}")
+        _.eprefix=QLineEdit(f"{gc.devcfg['filename_prefix']}")
+
+        cancelbtn=QPushButton("&Cancel")
+        applybtn=QPushButton("&Apply")
+        savebtn=QPushButton("&Save")
+
+        cancelbtn.clicked.connect(lambda: _.close())
+        applybtn.clicked.connect(_.applysettings)
+        savebtn.clicked.connect(_.savesettings)
+
+        frm=QFormLayout()
+        frm.addRow("low current limit", _.ecrangemin)
+        frm.addRow("high current limit", _.ecrangemax)
+        frm.addRow("low injection pwm", _.einlow)
+        frm.addRow("pwm increment", _.eininc)
+        frm.addRow("inject volt high limit", _.einvhi)
+        frm.addRow("inject volt low limit", _.einvlo)
+        frm.addRow("injection try count", _.eintry)
+        frm.addRow("measurement volt limit", _.evlim)
+        frm.addRow("max measure try", _.emtry)
+        frm.addRow("filename prefix", _.eprefix)
+
+        btn=QHBoxLayout()
+        btn.addWidget(cancelbtn)
+        btn.addWidget(applybtn)
+        btn.addWidget(savebtn)
+
+        grid=QGridLayout()
+        grid.addLayout(frm,0,0)
+        grid.addLayout(btn,1,0)
+        _.setLayout(grid)
+
+
 class cmdButton(QPushButton):
     def __init__(_,txt, act=None):
         super(cmdButton,_).__init__(txt)
@@ -59,13 +140,30 @@ class Plotter(QFrame):
         _.resize(1024,600)
         _.scrimg=QPixmap(1024, 600)
         _.xof=50
-        _.yof=50
+        _.yof=100
         _.xskip=40
         _.yskip=30
         _.dia=20
+        _.cbx=20
+        _.cby=30
         _.datumbox={}
         _.probepos={}
         _.mapped=False
+
+    def colorscale(_,painter):
+        x=_.cbx+30
+        y=_.cby
+
+        for c in range(1,len(colorcode)):
+            painter.setPen(QPen(QColor(colorcode[c]), 1, Qt.SolidLine))
+            painter.setBrush(QBrush(QColor(colorcode[c]), Qt.SolidPattern))
+            painter.drawRect(x,y,3,10)
+            x+=3
+
+        painter.setFont(QFont('Arial', 8))
+        painter.setPen(Qt.magenta)
+        painter.drawText(_.cbx,_.cby+10, "%0.2f"%gc.rmin)
+        painter.drawText(x+10,_.cby+10, "%0.2f"%gc.rmax)
 
     def drawpoints(_):
 
@@ -125,7 +223,8 @@ class Plotter(QFrame):
                     if ymax<y: ymax=y
 
             y+=ys
-
+        
+        _.colorscale(p)
         p.end()
 
         _.datumbox=pp
@@ -173,7 +272,8 @@ class Plotter(QFrame):
         for g in range(1,_.master.pconf['nprobe']):
             if gc.probres[g,g+1]:
                 p.drawText(_.probepos[g][0]+15, _.probepos[g][1]-5, '%0.2f'%gc.probres[g,g+1][0])
-        
+
+        _.colorscale(p)
         p.end()
     
     def paintEvent(_, event):
@@ -184,7 +284,8 @@ class Plotter(QFrame):
                 _.updatepoints()
             else:
                 _.scrimg=_.drawpoints()
-
+                _.resize(_.scrimg.width(), _.scrimg.height())
+            
             pc.drawPixmap(0,0,_.scrimg)
         else:
             pc.setPen(Qt.yellow)
@@ -226,6 +327,7 @@ class GEWin(QWidget):
 
     def createGadgets(_):
         scroll=QScrollArea()
+        scroll.setAlignment(Qt.AlignCenter)
         scroll.setWidget(_.canvas)
         lyo=QVBoxLayout()
         lyo.addWidget(scroll,5)
@@ -274,6 +376,7 @@ class GEWin(QWidget):
 
     def doset(_):
         print('acquisition settings')
+        setDialog(_)
 
 
 class GEApps(QApplication):

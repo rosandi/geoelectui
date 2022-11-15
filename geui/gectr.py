@@ -34,7 +34,7 @@ devcfg = {
     'injection_max_try': 50,
     'voltage_limit': 4966.0,
     'max_measurement_try': 10,
-    'filename_prefix': 'data-',
+    'filename_prefix': 'data-'
 }
 
 nan=float('nan');
@@ -113,7 +113,7 @@ def custom_measurement():  # pc is the probe configuration dict
         print('incompatible configuration: probe {} <-> {}'.format(pconf['nprobe'], nprobe))
         return
     
-    rmin,rmax=0,0
+    rmin,rmax=1e6,0
 
     for p in pconf['conf']:
 
