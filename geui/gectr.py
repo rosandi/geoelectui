@@ -91,7 +91,7 @@ def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
         
     return ip
 
-def holdcurrent():
+def currentclamp():
     # call this with thread!
 
     ip=measure_current()
@@ -102,6 +102,17 @@ def holdcurrent():
         elif ap>ip:
             g.decr_injection()
 
+def hold_current():
+    global curtrd
+
+    current_control.set()
+    curtrd=Thread(target=currentclamp)
+    curtrd.start()
+
+
+def release_current():
+    current_control.clear()
+    curtrd.join()
 
 def set_conf(cfg):
     global pconf,resarr, probres, firsttake
