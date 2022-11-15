@@ -44,10 +44,9 @@ for arg in sys.argv:
 css='seismolog.css'
 with open(css) as c: css=c.read()
 
-
-class logWindow(QWidget):
+class logBox(QWidget):
     def __init__(_,master):
-        super(logWindow,_).__init__(master)
+        super(logBox,_).__init__(master)
         fn=QFont()
         fn.setPointSize(8)
         _.logtext=QPlainTextEdit(_)
@@ -346,7 +345,7 @@ class GEWin(QWidget):
         _.uptimer=QTimer()
         _.uptimer.timeout.connect(_.update)
         _.createGadgets()
-        _.logwin=logWindow(_)
+        _.logwin=logBox(_)
         _.show()
 
     def createGadgets(_):
