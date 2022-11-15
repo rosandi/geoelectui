@@ -185,10 +185,12 @@ def custom_measurement():  # pc is the probe configuration dict
     msrev.clear()
 
 def measure_resistances():
-    global probres
+    global probres, logstring
 
     for pr in probres:
         probres[pr]=None
+
+    logstring=''
     
     for p in range(1, pconf['nprobe']):
 
