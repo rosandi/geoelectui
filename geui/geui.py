@@ -44,6 +44,20 @@ for arg in sys.argv:
 css='seismolog.css'
 with open(css) as c: css=c.read()
 
+class logWindow(QDialog):
+    def __init__(_, master):
+        super(logWindow, _).__init__(master)
+        _.logtext=QPlainTextEdit()
+        _.logtext.setReadOnly(True)
+        _.logtext.setPlainText(gc.logstring)
+        cbtn=QPushButton('&Close')
+        cbtn.clicked.connect(lambda: _.close())
+        lyo=QVBoxLayout()
+        lyo.addWidget(_.logtext)
+        lyo.addWidget(cbtn)
+        _.setLayout(lyo)
+        _.exec_()
+
 class logBox(QWidget):
     def __init__(_,master):
         super(logBox,_).__init__(master)
@@ -116,10 +130,12 @@ class setDialog(QDialog):
         _.emtry=QLineEdit(f"{gc.devcfg['max_measurement_try']}")
         _.eprefix=QLineEdit(f"{gc.devcfg['filename_prefix']}")
 
+        logbtn=QPushButton('&Log')
         cancelbtn=QPushButton("&Cancel")
         applybtn=QPushButton("&Apply")
         savebtn=QPushButton("&Save")
 
+        logbtn.clicked.connect(lambda: logWindow(_))
         cancelbtn.clicked.connect(lambda: _.close())
         applybtn.clicked.connect(_.applysettings)
         savebtn.clicked.connect(_.savesettings)
@@ -140,6 +156,7 @@ class setDialog(QDialog):
         btn.addWidget(cancelbtn)
         btn.addWidget(applybtn)
         btn.addWidget(savebtn)
+        btn.addWidget(logbtn)
 
         grid=QGridLayout()
         grid.addLayout(frm,0,0)
