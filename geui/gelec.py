@@ -114,15 +114,23 @@ def discharge(minvolt, minpwm=5, verbose=False):
 
 # just in case there are more than one field take the first!
 def measure_voltage():
+    '''measure from isolated volt meter: voltage probe'''
     return float(send('V').split()[0])
 
 def measure_current():
+    '''injection current measurement (INA219) in mA'''
     return float(send('A').split()[0])
 
 def measure_injection():
+    '''
+    injection voltage measure by ADC A0 in V 
+    calculated scale:235 (attn*Vref_1.1), used scale in Arduino 220
+    divider: 1M & 4k7
+    '''
     return float(send('J').split()[0])
 
 def measure_shunt():
+    '''shunt voltage in mV (INA219)'''
     return float(send('S').split()[0])
 
 def calibrate():

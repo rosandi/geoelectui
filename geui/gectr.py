@@ -19,6 +19,8 @@ from threading import Thread, Event
 maxlayer=3
 msrthread_id=None
 msrev=Event()
+current_control=Event()
+
 pp=0
 pm=0
 vp=0
@@ -70,7 +72,7 @@ def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
         if not msrev.is_set():
             break
     
-        ip=g.measure_current();
+        ip=g.measure_current()
         if ip<crange[0]:
             g.incr_injection(devcfg['injection_pwm_increment'])
         elif ip>crange[1]:
@@ -88,6 +90,18 @@ def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
             break
         
     return ip
+
+def holdcurrent():
+    # call this with thread!
+
+    ip=measure_current()
+    while current_control.is_set():
+        ap=measure_current()
+        if ap < ip:
+            g.incr_injection()
+        elif ap>ip:
+            g.decr_injection()
+
 
 def set_conf(cfg):
     global pconf,resarr, probres, firsttake
