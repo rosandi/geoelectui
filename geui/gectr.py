@@ -108,13 +108,15 @@ def set_conf(cfg):
 def custom_measurement():  # pc is the probe configuration dict
     '''read configuration from file'''
 
-    global rmin,rmax, pm,pp,vm,vp
+    global rmin,rmax, pm,pp,vm,vp, logstring
     
     if not pconf: return
 
     # clear previous measurement data
     for p in resarr:
         resarr[p]=(p, None)
+
+    logstring=''
 
     if pconf['nprobe'] != g.NPROBE:
         plog('incompatible configuration: probe {} <-> {}'.format(pconf['nprobe'], nprobe))
