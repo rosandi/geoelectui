@@ -1,6 +1,17 @@
 {
 	"name":"dipol-dipol configuration",
 	"comment": "[[coord_x, coord_y],[pm, pp, vm, vp]]",
+	"device_configuration":{
+	    "crange": [50.0,100.0],
+	    "injection_low_pwm": 20,
+	    "injection_pwm_increment": 5,
+	    "injection_volt_limit": 200,
+	    "injection_volt_low": 15,
+	    "injection_max_try": 50,
+	    "voltage_limit": 4966.0,
+	    "max_measurement_try": 10,
+	    "filename_prefix": "data-"
+	},
 	"nprobe": 16,
 	"roffs":[1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8, 8.5,9,9.5,10,10.5],
 	"conf": [

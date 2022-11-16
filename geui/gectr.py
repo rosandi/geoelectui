@@ -127,11 +127,15 @@ def release_current():
 # ----------------------------
 
 def set_conf(cfg):
-    global pconf,resarr, probres, firsttake, probres_avail
+    global pconf,resarr, probres, firsttake, probres_avail, devconf
 
     pconf=cfg
     firsttake=True
     probres_avail=False
+    logstring=''
+
+    if 'device_configuration' in cfg:
+        devconf=cfg['device_configuration']
 
     resarr={}
 
@@ -152,8 +156,6 @@ def custom_measurement():  # pc is the probe configuration dict
     # clear previous measurement data
     for p in resarr:
         resarr[p]=(p, None)
-
-    logstring=''
 
     if pconf['nprobe'] != g.NPROBE:
         plog('incompatible configuration: probe {} <-> {}'.format(pconf['nprobe'], nprobe))

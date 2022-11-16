@@ -388,7 +388,6 @@ class GEWin(QWidget):
         _.canvas.repaint()
         _.logwin.setText(gc.logstring)
         
-
         if not gc.msrev.is_set():
             _.uptimer.stop()
             _.cfg.setText('Probe Conf')
@@ -436,6 +435,10 @@ class GEWin(QWidget):
         _.cfg.setText('&CANCEL')
         _.grayButton(True)
         gc.msrev.set()
+
+        _.logwin.show()  # FIXME
+        _.logwin.clear()
+
         trid=Thread(target=gc.measure_resistances)
         trid.start()
 
