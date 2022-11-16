@@ -10,6 +10,7 @@
 from time import sleep
 from datetime import datetime as dt
 import sys
+import json
 import numpy as np
 from math import isnan
 from threading import Thread, Event
@@ -33,7 +34,7 @@ devcfg = {
     'injection_low_pwm': 20,
     'injection_pwm_increment': 5,
     'injection_volt_limit': 400,
-    'injection_volt_low': 15,
+    'injection_volt_low': 18,
     'injection_max_try': 50,
     'voltage_limit': 4966.0,
     'max_measurement_try': 10,
@@ -57,6 +58,7 @@ probres={} # interprobe resistances
 rmin=0
 rmax=0
 firsttake=True
+probres_avail=False
 logstring=''
 
 def plog(s):
@@ -64,33 +66,42 @@ def plog(s):
     logstring+='\n'+s
     print(s)
 
-def adjustcurrent(crange, ntry=devcfg['injection_max_try']):
+def adjust_measure(crange, ntry=devcfg['injection_max_try']):
     ip=0.0
     nt=0
         
-    while not (ip>crange[0] and ip<crange[1]):  
+    while not (ip>crange[0] and ip<crange[1]):
+
         if not msrev.is_set():
             break
     
-        ip=g.measure_current()
         if ip<crange[0]:
             g.incr_injection(devcfg['injection_pwm_increment'])
         elif ip>crange[1]:
             g.decr_injection(devcfg['injection_pwm_increment'])
+
+        ip=g.measure_current()
         vol=g.measure_injection()
         
         if vol>devcfg['injection_volt_limit']:
+            plog(f'injection limit exceeded {vol}V')
             break
             
-        plog("injection: %0.4fmA at %0.3fV (curr_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
+        plog("injection: %0.3EmA at %0.3EV (I_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
         
         nt+=1
         if nt>ntry:
-            plog("max try number reached")
+            plog("maximum try...")
             break
-        
-    return ip
 
+    sleep(g.WAIT2)
+
+    ip=g.measure_current()
+    vol=g.measure_voltage()
+
+    return ip, vol
+
+#   ------- UNTESTED ------
 def currentclamp():
     # call this with thread!
 
@@ -109,16 +120,18 @@ def hold_current():
     curtrd=Thread(target=currentclamp)
     curtrd.start()
 
-
 def release_current():
     current_control.clear()
     curtrd.join()
 
+# ----------------------------
+
 def set_conf(cfg):
-    global pconf,resarr, probres, firsttake
+    global pconf,resarr, probres, firsttake, probres_avail
 
     pconf=cfg
     firsttake=True
+    probres_avail=False
 
     resarr={}
 
@@ -161,55 +174,63 @@ def custom_measurement():  # pc is the probe configuration dict
 
         plog("> {} probe conf: pm={} pp={} vm={} vp={}".format(p[0],pm,pp,vm,vp))
         
-        # measure self potential. FIXME! statistics
+        ntry=0
         g.discharge(devcfg['injection_volt_low'],verbose=True)
-        sleep(g.WAIT)
-        g.probe(0,0,vm,vp)
-        sv=g.measure_voltage()
-        
-        ntry=0
-        if ntry<devcfg['max_measurement_try'] and sv>=devcfg['voltage_limit']:
+
+        while ntry<devcfg['max_measurement_try']:
             ntry+=1
-            plog('bad probe contact (V_self).. retrying..')
-            continue
             
-        # injection
-        g.inject(False)
-        sleep(g.WAIT)
+            # 1. discharge
+            g.probe_off()
+            g.inject(False)
+            #g.discharge(devcfg['injection_volt_low'],verbose=True)
+            sleep(g.WAIT)
+            
+            # 2. measure self potential
+            g.probe(0,0,vm,vp)
+            sv=g.measure_voltage()
 
-        g.probe(pm,pp,vm,vp)
-        g.set_injection(devcfg['injection_low_pwm'])
-        g.inject()
-        sleep(g.WAIT)
+            if sv>devcfg['voltage_limit']:
+                plog(f'volt measurement limit (sv)')
+                g.probe_off()
+                break
+            
+            # 3. current injection and measurement
+
+            g.inject(False)  # release first
+            sleep(g.WAIT)
+
+            g.probe(pm,pp,vm,vp)
+            g.set_injection(devcfg['injection_low_pwm'])
+            g.inject()
+
+            mi,mv=adjust_measure(devcfg['crange'])
+
+            if mv>devcfg['voltage_limit']:
+                plog(f'volt measurement limit {mv}... retrying...')
+                g.probe_off()
+                continue
+           
+            if mi!=0.0:
+                mr=abs((mv-sv)/mi)
+                if rmin>mr: rmin=mr
+                if rmax<mr: rmax=mr
+            else:
+                mr=float('nan')
+
+            resarr[tuple(p[0])]=(p[0], [mv,mi,mr,sv])
+            plog("R=%0.2EOhm V=%0.2EmV C_inj=%0.2EmA V_self=%0.2EmV"%(mr,mv,mi,sv))
+            break
         
-        mi=0.0
-        mi=adjustcurrent(devcfg['crange'])
-        mv=g.measure_voltage()
-
-        ntry=0
-        if ntry<devcfg['max_measurement_try'] and mv>=devcfg['voltage_limit']:
-            ntry+=1
-            plog('bad probe contact.. retrying...')
-            continue
-        
-        if mi!=0.0:
-            mr=np.abs((mv-sv)/mi)
-            if rmin>mr: rmin=mr
-            if rmax<mr: rmax=mr
-        else:
-            mr=float('nan')
-
-        resarr[tuple(p[0])]=(p[0], [mv,mi,mr,sv])
-        plog("R=%0.2fOhm V=%0.3fmV C_inj=%0.4fmA V_self=%0.3fmV"%(mr,mv,mi,sv))
-    
     g.probe_off()   # turn off relays
     g.discharge(devcfg['injection_volt_low'])
     g.flush()
     pm,pp,vm,vp=0,0,0,0
     msrev.clear()
+    saveData()
 
 def measure_resistances():
-    global probres, logstring
+    global probres, logstring, probres_avail
 
     for pr in probres:
         probres[pr]=None
@@ -220,7 +241,7 @@ def measure_resistances():
 
         if not msrev.is_set(): break
         
-        g.discharge(10.0)
+        g.discharge(devcfg['injection_volt_low'])
         sleep(g.WAIT2)
         g.set_injection(devcfg['injection_low_pwm'])
         g.probe(p,p+1,0,0)
@@ -242,6 +263,7 @@ def measure_resistances():
         
     g.probe_off()   
     msrev.clear()
+    probres_avail=True
 
 def resmap(p, clr):
     nn=len(clr)
@@ -264,27 +286,34 @@ def resmap(p, clr):
     return c
 
 def saveData():
-    fl=open(devcfg['filename_prefix']+str(int(dt.timestamp(dt.now()))),'w')
-    
-    jdata={'comment':'Geoelectric measurement data\nrosandi, 2020'+
-            'Geophysics Universitas Padjadjaran\n'+
-            'fields: volt curr res vself conf'}
+    try:
+        fnm=devcfg['filename_prefix']+str(int(dt.timestamp(dt.now())))+'.json'
+        plog(f'saving data to {fnm}')
+        jdata={ 
+                'comment':'Geoelectric measurement data\nrosandi, 2020\n'+
+                'Geophysics Universitas Padjadjaran',
+                'measurement_fields': '[cell_i, cell_j], [V, I, R, V_self]'
+            }
 
-    for a in resarr:
-        for b in a:
-            fl.write(str(b)+'\n')
-    fl.close()
+        vres=[]
+        for a in resarr: vres.append(resarr[a])
+        jdata['data']=vres
 
+        if probres_avail:
+            pres=[]
+            for a in probres: pres.append([a,probres[a]])
+            jdata['probe_resistance_fields']='[prob_i, prob_j], [R, V, I]'
+            jdata['probe_resistance']=pres
+        
+        jdata['conf']=pconf
+        
+        with open(fnm,'w') as fl:
+            json.dump(jdata,fl)
+
+    except Exception as e:
+        print(e)
+        plog('saving data failed')
    
-def saveRes():
-    fl=open(devcfg['filename_prefix']+'res-'+str(int(dt.timestamp(dt.now()))),'w')
-    fl.write('# resistance measurement data\n')
-    fl.write('# rosandi, 2020\n')
-    fl.write('# Geophysics Universitas Padjadjaran\n')
-    for a in range(len(probres)):
-        fl.write(str((a+1,a+2)+probres[a])+'\n')
-    fl.close()
-
 def init_dev(comm,speed,cal=True):
     global g
 

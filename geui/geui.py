@@ -117,6 +117,10 @@ class setDialog(QDialog):
                     json.dump(gc.devcfg,fl)
                 _.close()
 
+    def applyandclose(_):
+        if _.applysettings():
+            _.close()
+
     def create(_):
         _.setWindowTitle("GE Settings")
         _.ecrangemin=QLineEdit(f"{gc.devcfg['crange'][0]}")
@@ -137,7 +141,7 @@ class setDialog(QDialog):
 
         logbtn.clicked.connect(lambda: logWindow(_))
         cancelbtn.clicked.connect(lambda: _.close())
-        applybtn.clicked.connect(_.applysettings)
+        applybtn.clicked.connect(lambda: _.applyandclose)
         savebtn.clicked.connect(_.savesettings)
 
         frm=QFormLayout()

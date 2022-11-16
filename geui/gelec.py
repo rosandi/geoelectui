@@ -17,6 +17,7 @@ READY=False
 current_offset=0.0
 WAIT=0.5
 WAIT2=2
+HVREF=1000
 
 def flush():
     s=ser.readlines()
@@ -100,15 +101,20 @@ def inject(stat=True):
     else:
         send('D')
 
-def discharge(minvolt, minpwm=5, verbose=False):
+def discharge(minvolt, minpwm=0, timeout=30, verbose=False):
     set_injection(minpwm)
     send('D')
     vlow=measure_injection()
+    to=0
     while vlow > minvolt:
         vlow=measure_injection()
-        if verbose:
-            print("discharging: %0.3fV"%(vlow))
+        print("discharging: %0.3fV"%(vlow))
         sleep(1)
+        to+=1
+
+        if to>timeout:
+            print("discharge timeout...")
+            break
     
     return ("discharged: %0.3fV"%(vlow))
 
@@ -152,8 +158,8 @@ def soft_calibrate(n=10, verbose=False):
             print(a,b)
     cu=cu/n
     sh=sh/n
-    send("c %0.4f %0.4f 0"%(cu,sh))
-    discharge(10.0)
+    send("c %0.4f %0.4f %d"%(cu,sh,HVREF))
+    discharge(20.0)
     
     return cu,sh
     
