@@ -163,10 +163,13 @@ def custom_measurement():  # pc is the probe configuration dict
     
     rmin,rmax=1e6,0
 
+    abort=False
+
     for p in pconf['conf']:
 
         if not msrev.is_set(): 
             plog('measurement aborted')
+            abort=True
             break;
 
         pm=p[1][0]
@@ -180,6 +183,12 @@ def custom_measurement():  # pc is the probe configuration dict
         g.discharge(devcfg['injection_volt_low'],verbose=True)
 
         while ntry<devcfg['max_measurement_try']:
+
+            if not msrev.is_set(): 
+                plog('measurement aborted')
+                abort=True
+                break;
+
             ntry+=1
             
             # 1. discharge
@@ -225,11 +234,14 @@ def custom_measurement():  # pc is the probe configuration dict
             break
         
     g.probe_off()   # turn off relays
+    g.inject(False)
     g.discharge(devcfg['injection_volt_low'])
     g.flush()
     pm,pp,vm,vp=0,0,0,0
     msrev.clear()
-    saveData()
+
+    if not abort: 
+        saveData()
 
 def measure_resistances():
     global probres, logstring, probres_avail
@@ -398,6 +410,7 @@ if __name__ == "__main__":
                 # calv true_value
                 vtrue=float(cmdln.split()[1])
                 g.cal_vinj()
+                print(g.get_devinfo())
 
             elif cmdln.find('flush')==0:
                 print(g.flush())

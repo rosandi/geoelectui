@@ -9,7 +9,8 @@ from PyQt5.QtCore import Qt, QRect, QTimer
 from PyQt5.QtWidgets import (
         QWidget, QApplication, QScrollArea, 
         QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, 
-        QPushButton, QDialog, QFileDialog, QLineEdit, QPlainTextEdit
+        QPushButton, QDialog, QFileDialog, QLineEdit, QPlainTextEdit,
+        QMessageBox
         )
 
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush, QPen
@@ -169,9 +170,9 @@ class setDialog(QDialog):
 
 
 class cmdButton(QPushButton):
-    def __init__(_,txt, act=None):
+    def __init__(_,txt, act=None, sty='cmdButton'):
         super(cmdButton,_).__init__(txt)
-        _.setObjectName('cmdButton')
+        _.setObjectName(sty)
 
         if(act):
             _.clicked.connect(act)
@@ -345,14 +346,22 @@ class Controls(QFrame):
         _.master.cfg=cmdButton('Probe Conf', _.master.probeconf)
         _.master.acq=cmdButton('Acquire', _.master.doacq)
         _.master.res=cmdButton('Resistance', _.master.dores)
-        _.master.sett=cmdButton('Settings', _.master.doset)
+        _.master.sett=cmdButton('Settings', _.master.doset, sty='cfgButton')
 
         lyo=QHBoxLayout()
         lyo.addWidget(_.master.cfg)
         lyo.addWidget(_.master.acq)
         lyo.addWidget(_.master.res)
-        lyo.addWidget(_.master.sett)
-        _.setLayout(lyo)
+
+        slo=QVBoxLayout()
+        slo.addWidget(_.master.sett)
+        slo.addWidget(cmdButton('Quit', lambda: _.master.closing(), sty='cfgButton'))
+
+        mlo=QHBoxLayout()
+        mlo.addLayout(lyo,5)
+        mlo.addLayout(slo,1)
+        
+        _.setLayout(mlo)
 
 class GEWin(QWidget):
     def __init__(_,w,h):
@@ -394,7 +403,7 @@ class GEWin(QWidget):
             _.grayButton(False)
             _.logwin.hide()
 
-    def probeconf(_):
+    def probeconf(_): # this button has 2 functions..: cancel
         if gc.msrev.is_set():
             gc.msrev.clear()
             #_.cfg.setText('Probe Conf')
@@ -445,8 +454,15 @@ class GEWin(QWidget):
         _.uptimer.start(100)
 
     def doset(_):
-        print('acquisition settings')
         setDialog(_)
+
+    def closing(_):
+        confirm=QMessageBox.question(_, 'Quit', 'Confirm to quit?', 
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if confirm == QMessageBox.Yes :
+            gc.msrev.clear()
+            _.close()
 
 
 class GEApps(QApplication):

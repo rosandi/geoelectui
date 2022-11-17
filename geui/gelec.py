@@ -172,6 +172,9 @@ def soft_calibrate(n=10, verbose=False):
     discharge(20.0)
     
     return cu,sh
+
+def get_devinfo():
+    return send('?')
     
 def measure_resistance():
     try:
@@ -212,12 +215,6 @@ def measureloop(pm,pp,vm,vp,avg=20,rep=0):
                 
     except:
         pass
-
-def display():
-    send('e 0 0 %clear')
-    send('e 0 0 Resistivity Meter')
-    send('e 0 1 GeoPhy Instrument')
-    send('e 0 2 Univ. Padjadjaran ')
 
 def init(sdev,speed=9600):
     global ser
