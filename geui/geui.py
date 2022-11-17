@@ -355,7 +355,7 @@ class Controls(QFrame):
 
         slo=QVBoxLayout()
         slo.addWidget(_.master.sett)
-        slo.addWidget(cmdButton('Quit', lambda: _.master.closing(), sty='cfgButton'))
+        slo.addWidget(cmdButton('Quit', lambda: _.master.close(), sty='cfgButton'))
 
         mlo=QHBoxLayout()
         mlo.addLayout(lyo,5)
@@ -456,13 +456,16 @@ class GEWin(QWidget):
     def doset(_):
         setDialog(_)
 
-    def closing(_):
+    def closeEvent(_,ev):
         confirm=QMessageBox.question(_, 'Quit', 'Confirm to quit?', 
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         
-        if confirm == QMessageBox.Yes :
+        if confirm == QMessageBox.Yes:
             gc.msrev.clear()
             _.close()
+            ev.accept()
+        else:
+            ev.ignore()
 
 
 class GEApps(QApplication):
