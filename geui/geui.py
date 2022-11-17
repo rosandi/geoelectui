@@ -417,6 +417,13 @@ class GEWin(QWidget):
             with open(fnm) as fl:
                 pc=json.load(fl)
             
+            if 'device_configuration' in pc:
+                confirm=QMessageBox.question(_, 'Device Configuration', 
+                        'Device configuration found.\nLoad as new configuration ?', 
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                if confirm==QMessageBox.No:
+                    pc['device_configuration']={}
+
             _.pconf=pc
             gc.set_conf(_.pconf)
             _.canvas.repaint()

@@ -127,7 +127,7 @@ def release_current():
 # ----------------------------
 
 def set_conf(cfg):
-    global pconf,resarr, probres, firsttake, probres_avail, devconf
+    global pconf,resarr, probres, firsttake, probres_avail, devcfg
 
     pconf=cfg
     firsttake=True
@@ -135,7 +135,11 @@ def set_conf(cfg):
     logstring=''
 
     if 'device_configuration' in cfg:
-        devconf=cfg['device_configuration']
+        cc=cfg['device_configuration']
+
+        if cc:
+            for c in cc:
+                devcfg[c]=cc[c]
 
     resarr={}
 
