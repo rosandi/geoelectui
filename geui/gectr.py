@@ -338,6 +338,8 @@ def init_dev(comm,speed,cal=True):
     g.set_naverage(20)
     g.plog=plog
 
+    
+
 ##########################
 ###### MAIN PROGRAM ######
 ##########################
@@ -391,6 +393,11 @@ if __name__ == "__main__":
                     g.inject(False)
                 else:
                     g.inject(True)
+
+            elif cmdln.find('calv')==0:
+                # calv true_value
+                vtrue=float(cmdln.split()[1])
+                g.cal_vinj()
 
             elif cmdln.find('flush')==0:
                 print(g.flush())

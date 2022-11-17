@@ -139,6 +139,16 @@ def measure_shunt():
     '''shunt voltage in mV (INA219)'''
     return float(send('S').split()[0])
 
+def cal_vinj(vtrue, avg=10):
+    send('c 0 0 1')
+    vin=0
+    for i in range(avg)
+        vin+=measure_injection()
+    vin/=avg
+    scl=int(vin/vtrue)
+    send(f'c 0 0 {scl}')
+    send('C')
+    
 def calibrate():
     a=send('C').split()
     # current_offset shunt_offset
@@ -202,7 +212,7 @@ def measureloop(pm,pp,vm,vp,avg=20,rep=0):
                 
     except:
         pass
-    
+
 def display():
     send('e 0 0 %clear')
     send('e 0 0 Resistivity Meter')
