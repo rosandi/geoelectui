@@ -89,7 +89,7 @@ def adjust_measure(crange, ntry=devcfg['injection_max_try']):
             plog(f'injection limit exceeded {vol}V')
             break
             
-        plog("injection: %0.3EmA at %0.3EV (I_limit: %0.3f,%0.3f)"%(ip,vol,crange[0],crange[1]))
+        plog("injection: I=%0.3EmA V=%0.3EV (I_limit: %0.2f,%0.2f)"%(ip,vol,crange[0],crange[1]))
         
         nt+=1
         if nt>ntry:
@@ -142,6 +142,8 @@ def set_conf(cfg):
         if cc:
             for c in cc:
                 devcfg[c]=cc[c]
+        else:
+            cfg['device_configuration']=devcfg
 
     resarr={}
 
@@ -322,7 +324,10 @@ def saveData():
             jdata['measurement_status']='success'
 
         vres=[]
-        for a in resarr: vres.append(resarr[a])
+        for a in resarr: 
+            if(resarr[a][1]):
+                vres.append(resarr[a])
+
         jdata['data']=vres
 
         if probres_avail:
