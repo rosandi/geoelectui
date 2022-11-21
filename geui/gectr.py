@@ -97,9 +97,9 @@ def adjust_measure(crange, ntry=devcfg['injection_max_try']):
     sleep(g.WAIT2)
 
     ip=g.measure_current()
-    vol=g.measure_voltage()
+    meter_vol=g.measure_voltage()
 
-    return ip, vol
+    return ip, meter_vol, vol
 
 #   ------- UNTESTED ------
 def currentclamp():
@@ -169,6 +169,9 @@ def custom_measurement():  # pc is the probe configuration dict
 
     abort=False
 
+    # use previous voltage to discharge
+    prevolt=devcfg['injection_volt_low']
+
     for p in pconf['conf']:
 
         if not msrev.is_set(): 
@@ -184,7 +187,7 @@ def custom_measurement():  # pc is the probe configuration dict
         plog("> {} probe conf: pm={} pp={} vm={} vp={}".format(p[0],pm,pp,vm,vp))
         
         ntry=0
-        g.discharge(devcfg['injection_volt_low'],verbose=True)
+        g.discharge(prevolt,verbose=True)
 
         while ntry<devcfg['max_measurement_try']:
 
@@ -216,10 +219,10 @@ def custom_measurement():  # pc is the probe configuration dict
             sleep(g.WAIT)
 
             g.probe(pm,pp,vm,vp)
-            g.set_injection(devcfg['injection_low_pwm'])
+            g.set_injection(prevolt)
             g.inject()
 
-            mi,mv=adjust_measure(devcfg['crange'])
+            mi,mv,prevolt=adjust_measure(devcfg['crange'])
 
             if mv>devcfg['voltage_limit']:
                 plog(f'volt measurement limit {mv}... retrying...')

@@ -106,6 +106,8 @@ def discharge(minvolt, minpwm=0, timeout=30, verbose=False):
     send('D')
     vlow=measure_injection()
     to=0
+
+    # only when the voltage more than requested (minvolt)
     while vlow > minvolt:
         vlow=measure_injection()
         print("discharging: %0.3fV"%(vlow))
