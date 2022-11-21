@@ -144,8 +144,10 @@ def measure_shunt():
 def cal_vinj(vtrue, avg=10):
     send('c 0 0 1')
     vin=0
-    for i in range(avg)
+
+    for i in range(avg):
         vin+=measure_injection()
+
     vin/=avg
     scl=int(vin/vtrue)
     send(f'c 0 0 {scl}')
