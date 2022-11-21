@@ -21,6 +21,7 @@ maxlayer=3
 msrthread_id=None
 msrev=Event()
 current_control=Event()
+abort=False
 
 pp=0
 pm=0
@@ -69,7 +70,8 @@ def plog(s):
 def adjust_measure(crange, ntry=devcfg['injection_max_try']):
     ip=0.0
     nt=0
-        
+    vol=0
+
     while not (ip>crange[0] and ip<crange[1]):
 
         if not msrev.is_set():
@@ -153,7 +155,7 @@ def set_conf(cfg):
 def custom_measurement():  # pc is the probe configuration dict
     '''read configuration from file'''
 
-    global rmin,rmax, pm,pp,vm,vp, logstring
+    global rmin,rmax, pm,pp,vm,vp, logstring, abort
     
     if not pconf: return
 
@@ -246,9 +248,7 @@ def custom_measurement():  # pc is the probe configuration dict
     g.flush()
     pm,pp,vm,vp=0,0,0,0
     msrev.clear()
-
-    if not abort: 
-        saveData()
+    saveData()
 
 def measure_resistances():
     global probres, logstring, probres_avail
@@ -315,6 +315,11 @@ def saveData():
                 'Geophysics Universitas Padjadjaran',
                 'measurement_fields': '[cell_i, cell_j], [V, I, R, V_self]'
             }
+
+        if abort:
+            jdata['measurement_status']='aborted'
+        else:
+            jdata['measurement_status']='success'
 
         vres=[]
         for a in resarr: vres.append(resarr[a])
